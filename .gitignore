@@ -1,0 +1,30 @@
+# ==================== STM32CubeIDE ====================
+
+Drivers/
+Middlewares/
+
+# Build outputs
+Debug/
+Release/
+build/
+*.o
+*.d
+*.bin
+*.elf
+*.hex
+*.map
+*.list
+
+
+# ==================== ESP32 ====================
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# ==================== General ====================
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+*.log

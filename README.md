@@ -34,18 +34,16 @@
 ```mermaid
 flowchart TB
     subgraph ANALOG["ANALOG"]
-        PROBE["Probe\n±24V"] --> AFE["AFE\nAuto-Range"]
+        PROBE["Probe<br>±24V"] --> AFE["AFE<br>Auto-Range"]
     end
 
-    subgraph STM32["STM32F4 — Real-Time Core"]
-        direction LR
-        ADC["ADC\n12-bit\n1 MSPS"] --> DMA["DMA\nBuffer"] --> DSP["DSP\nFFT | Measure"]
-        DSP --> OLED["OLED\n128x64"]
+    subgraph STM32["STM32F4 @ 100 MHz"]
+        ADC["ADC 12-bit<br>up to 1 MSPS"] --> DSP["DSP<br>FFT | Measure"]
+        DSP --> OLED["OLED"]
     end
 
-    subgraph ESP32["ESP32 — Wireless Bridge"]
-        direction LR
-        SPI_S["SPI\nSlave"] --> STATE["State\nManager"] --> WS["WebSocket\nServer"]
+    subgraph ESP32["ESP32 @ 240 MHz"]
+        SPI_S["SPI"] --> WS["WebSocket"]
     end
 
     subgraph CLIENT["BROWSER"]
@@ -53,9 +51,9 @@ flowchart TB
     end
 
     AFE --> ADC
-    DSP ==>|"SPI @ 12.5 MHz\n512 bytes"| SPI_S
-    DSP -.->|"UART\nMeasurements"| STATE
-    WS <-->|"WiFi AP\n192.168.4.1"| UI
+    DSP ==>|"Waveform<br>SPI @ 6.25 MHz"| SPI_S
+    DSP <-->|"Measurements + Commands<br>UART 115200"| WS
+    WS <-->|"WiFi AP"| UI
 
     style ANALOG fill:#fff3cd,stroke:#ffc107
     style STM32 fill:#e7f5ff,stroke:#339af0
@@ -69,6 +67,34 @@ flowchart TB
 
 No router needed. No software installation. Connect to the oscilloscope's WiFi and open a browser.
 
+<details>
+<summary>Power Sequencing</summary>
+
+```mermaid
+flowchart LR
+    PWR["Power On"] --> STM["STM32<br>boots first<br>~30 ms"]
+    STM --> OLED["OLED<br>via I2C<br>~200 ms"]
+    PWR --> ESP["ESP32<br>boots parallel<br>~1000 ms"]
+    OLED --> READY["System Ready<br>~1.7 s"]
+    ESP --> READY
+
+    style STM fill:#e7f5ff,stroke:#339af0
+    style OLED fill:#d3f9d8,stroke:#40c057
+    style ESP fill:#ffe8cc,stroke:#fd7e14
+    style READY fill:#d3f9d8,stroke:#40c057
+```
+
+| Event | Time |
+|-------|------|
+| STM32 GPIO safe | ~30 ms |
+| OLED splash | ~200 ms |
+| ESP32 WiFi ready | ~1000 ms |
+| System ready | ~1.7 s |
+
+**Both MCUs boot in parallel.** STM32 is faster but waits for splash screens. ESP32 is slower but catches up.
+
+</details>
+
 ---
 
 ## Features
@@ -80,7 +106,6 @@ No router needed. No software installation. Connect to the oscilloscope's WiFi a
 - **Local Display**: 128×64 OLED for standalone operation
 
 ---
-
 ## Analog Front End
 
 **Constraints:** Under $10 BOM | Single 3.3V supply | Survives ±24V input
@@ -89,26 +114,48 @@ No router needed. No software installation. Connect to the oscilloscope's WiFi a
 
 ```mermaid
 flowchart LR
-    IN(["±24V"]) --> R1["1MΩ"] --> D1["Clamp"] --> MUX["Analog MUX\n8 resistors"] --> AMP["x11"] --> D2["Clamp"] --> STM["STM32"]
-    
-    MUX --> VGND(["1.65V"])
-    STM -.->|"Same MCU\ncontrols gain"| MUX
+    subgraph INPUT["INPUT"]
+        IN(["±24V"])
+    end
+
+    subgraph PROTECTION["PROTECT + ATTENUATE"]
+        R1["1MΩ"]
+        D1["Clamp"]
+        MUX["Analog MUX<br>8 gain levels<br>Boot: safest"]
+        VGND(["1.65V"])
+    end
+
+    subgraph GAIN["AMPLIFY"]
+        AMP["x11"]
+        D2["Clamp"]
+    end
+
+    subgraph MCU["STM32"]
+        ADC["Sample"]
+        AUTO["Auto-Range"]
+    end
+
+    IN --> R1 --> D1 --> MUX
+    MUX --> VGND
+    MUX --> AMP --> D2 --> ADC --> AUTO
+    AUTO -->|"Adjust gain"| MUX
 
     style D1 fill:#fff3cd,stroke:#ffc107
     style D2 fill:#fff3cd,stroke:#ffc107
     style MUX fill:#e7f5ff,stroke:#339af0
     style AMP fill:#d3f9d8,stroke:#40c057
-    style STM fill:#e7f5ff,stroke:#339af0
+    style MCU fill:#e7f5ff,stroke:#339af0
 ```
 
-**How it works:** R1 (fixed) and the MUX-selected resistor form a voltage divider. The STM32 samples the signal, detects clipping or weakness, and switches resistors via GPIO — auto-ranging from ±24V down to ±150mV.
+**How it works:** Resistive voltage divider with 8 selectable ratios. The STM32 samples the signal and adjusts gain automatically — from ±24V down to ±150mV. Boots in safest mode.
 
 ### Schematic
 
 <p align="center">
-  <img src="hardware/afe_schematic.svg" alt="AFE Schematic" width="100%">
+  <img src="Hardware/afe_schematic.svg" alt="AFE Schematic" width="100%">
 </p>
 
+---
 ### Auto-Ranging
 
 | Signal | Action |
@@ -161,61 +208,8 @@ ADC is protected even if ±24V applied before MCU boots.
 
 | Issue | Impact | Status |
 |-------|--------|--------|
-| Timebase inaccuracy < 50 µs/div | Displays 2.56x more time than labeled | Documented |
 | No voltage calibration | ±5% accuracy | Future |
 | Software trigger only | May miss fast transients | Future |
-
----
-
-## Build Instructions
-
-```bash
-# Clone
-git clone https://github.com/yourusername/smart-oscilloscope
-cd smart-oscilloscope
-
-# STM32
-cd firmware/stm32
-make
-st-flash write build/scope.bin 0x8000000
-
-# ESP32
-cd ../esp32
-pio run -t upload         # Firmware
-pio run -t uploadfs       # Web UI
-```
-
-**Usage:**
-1. Power on
-2. Connect to WiFi: `SmartScope-Pro` / `12345678`
-3. Open browser: `http://192.168.4.1`
-
----
-
-## Project Structure
-
-```
-smart-oscilloscope/
-├── firmware/
-│   ├── stm32/
-│   │   └── Core/Src/
-│   │       ├── main.c .............. Main loop
-│   │       ├── osc_signal.c ........ DSP algorithms
-│   │       └── osc_display.c ....... OLED rendering
-│   └── esp32/
-│       ├── src/
-│       │   ├── main.cpp ............ WebSocket server
-│       │   ├── spi.cpp ............. SPI slave
-│       │   └── uart_handler.cpp .... Measurement parser
-│       └── data/
-│           └── index.html .......... Web UI
-├── hardware/
-│   ├── afe_schematic.svg
-│   └── bom.csv
-└── docs/
-    ├── demo.gif
-    └── hardware.jpg
-```
 
 ---
 
@@ -246,24 +240,6 @@ smart-oscilloscope/
 
 ---
 
-## What I Learned
-
-- **Multi-MCU architecture**: Separating real-time and networking tasks
-- **Wireless data streaming**: WebSocket for real-time embedded applications
-- **Analog signal conditioning**: Protection, auto-ranging, virtual ground biasing
-- **DSP fundamentals**: FFT windowing, EMA filtering, frequency measurement
-
----
-
-## Future Work
-
-- [ ] EEPROM calibration routine
-- [ ] Hardware trigger (comparator)
-- [ ] Protocol decoder (UART, I2C, SPI)
-- [ ] Battery operation
-
----
-
 ## License
 
 MIT License — See [LICENSE](LICENSE)
@@ -271,12 +247,9 @@ MIT License — See [LICENSE](LICENSE)
 ---
 
 <p align="center">
-  <b>Built by [Your Name]</b><br><br>
-  <a href="https://linkedin.com/in/yourprofile">LinkedIn</a> ·
-  <a href="mailto:your@email.com">Email</a> ·
-  <a href="https://yourportfolio.com">Portfolio</a>
+  <b>Built by Mohammad Reza Safaeian</b><br><br>
+  <a href="mailto:your@email.com">Email</a>
 </p>
-```
 
 ---
 

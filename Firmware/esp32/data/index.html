@@ -1,0 +1,2439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Smart Oscilloscope Pro</title>
+  <style>
+    :root {
+      --bg-primary: #05080f;
+      --bg-secondary: #0a1019;
+      --bg-tertiary: #111a2b;
+      --bg-elevated: rgba(17, 26, 43, 0.95);
+      
+      --accent-primary: #00ff88;
+      --accent-secondary: #00d4ff;
+      --accent-tertiary: #a855f7;
+      --accent-warning: #fbbf24;
+      --accent-danger: #ef4444;
+      
+      --text-primary: #ffffff;
+      --text-secondary: #a0b3c6;
+      --text-muted: #5a7190;
+      
+      --border-color: rgba(0, 255, 136, 0.25);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      
+      --glow-primary: rgba(0, 255, 136, 0.5);
+      --glow-secondary: rgba(0, 212, 255, 0.5);
+      
+      --spacing-xs: 4px;
+      --spacing-sm: 8px;
+      --spacing-md: 12px;
+      --spacing-lg: 16px;
+      
+      --touch-min: 44px;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      
+      --header-height: 52px;
+      --btn-size: 38px;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      height: 100dvh;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: 
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(0, 255, 136, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(0, 212, 255, 0.04) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    
+    #app {
+      display: grid;
+      grid-template-rows: var(--header-height) 1fr auto;
+      height: 100%;
+      position: relative;
+      z-index: 1;
+    }
+    
+    header {
+      background: linear-gradient(180deg, rgba(10, 16, 25, 0.98) 0%, rgba(5, 8, 15, 0.95) 100%);
+      padding: 0 var(--spacing-lg);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      backdrop-filter: blur(20px);
+      z-index: 100;
+    }
+    
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-primary), var(--accent-secondary), transparent);
+      opacity: 0.5;
+    }
+    
+    .logo-section {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+    }
+    
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 4px 20px var(--glow-primary);
+      flex-shrink: 0;
+    }
+    
+    .logo-text h1 {
+      font-family: 'Orbitron', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: 1px;
+    }
+    
+    .header-center {
+      display: none;
+      align-items: center;
+      gap: var(--spacing-md);
+    }
+    
+    .header-stat {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      padding: 6px 12px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+    }
+    
+    .header-stat-icon {
+      font-size: 14px;
+      opacity: 0.8;
+    }
+    
+    .header-stat-value {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-primary);
+      text-shadow: 0 0 10px var(--glow-primary);
+    }
+    
+    .header-stat-value.secondary {
+      color: var(--accent-secondary);
+      text-shadow: 0 0 10px var(--glow-secondary);
+    }
+    
+    .header-stat-value.tertiary {
+      color: var(--accent-tertiary);
+    }
+    
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+    }
+    
+    .mobile-stats {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+    }
+    
+    .mobile-stat {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-primary);
+      padding: 4px 8px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+    }
+    
+    .mobile-stat.clients {
+      color: var(--accent-tertiary);
+      border-color: rgba(168, 85, 247, 0.3);
+    }
+    
+    .connection-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--bg-tertiary);
+      border-radius: 20px;
+      border: 1px solid var(--border-subtle);
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-danger);
+      box-shadow: 0 0 8px var(--accent-danger);
+      animation: pulse 2s infinite;
+    }
+    
+    .status-dot.connected {
+      background: var(--accent-primary);
+      box-shadow: 0 0 10px var(--glow-primary);
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    
+    .status-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: none;
+    }
+    
+    .main-display {
+      position: relative;
+      overflow: hidden;
+      background: var(--bg-primary);
+    }
+    
+    .canvas-wrapper {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, #0a1018 0%, #050810 100%);
+    }
+    
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
+    
+    .canvas-buttons {
+      position: absolute;
+      top: var(--spacing-sm);
+      left: var(--spacing-sm);
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-xs);
+      z-index: 20;
+    }
+    
+    .canvas-btn {
+      width: var(--btn-size);
+      height: var(--btn-size);
+      background: var(--bg-elevated);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    
+    .canvas-btn:active {
+      transform: scale(0.92);
+    }
+    
+    .canvas-btn.active {
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      color: var(--bg-primary);
+      border-color: transparent;
+      box-shadow: 0 0 20px var(--glow-primary);
+    }
+    
+    .fullscreen-exit-btn {
+      display: none;
+      position: absolute;
+      top: var(--spacing-sm);
+      right: var(--spacing-sm);
+      width: 44px;
+      height: 44px;
+      background: rgba(239, 68, 68, 0.3);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--accent-danger);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 18px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    
+    .fullscreen-exit-btn:active {
+      background: var(--accent-danger);
+    }
+    
+    .mode-badge {
+      position: absolute;
+      top: var(--spacing-sm);
+      right: var(--spacing-sm);
+      padding: 6px 12px;
+      background: var(--bg-elevated);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--accent-primary);
+      letter-spacing: 2px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-shadow: 0 0 10px var(--glow-primary);
+    }
+    
+    .mode-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-primary);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--glow-primary);
+      animation: pulse 2s infinite;
+    }
+    
+    .landscape-stats {
+      display: none;
+      position: absolute;
+      top: var(--spacing-sm);
+      left: 50%;
+      transform: translateX(-50%);
+      gap: var(--spacing-sm);
+      z-index: 100;
+    }
+    
+    .landscape-stat {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-primary);
+      padding: 5px 10px;
+      background: var(--bg-elevated);
+      backdrop-filter: blur(10px);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      text-shadow: 0 0 10px var(--glow-primary);
+    }
+    
+    .landscape-stat.secondary {
+      color: var(--accent-secondary);
+    }
+    
+    .landscape-stat.tertiary {
+      color: var(--accent-tertiary);
+      border-color: rgba(168, 85, 247, 0.3);
+    }
+    
+    .landscape-controls {
+      display: none;
+      position: absolute;
+      bottom: var(--spacing-sm);
+      left: 50%;
+      transform: translateX(-50%);
+      gap: var(--spacing-xs);
+      z-index: 100;
+    }
+    
+    .lc-btn {
+      padding: 8px 14px;
+      background: var(--bg-elevated);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .lc-btn:active {
+      transform: scale(0.95);
+    }
+    
+    .lc-btn.active {
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      color: var(--bg-primary);
+      border-color: transparent;
+      box-shadow: 0 0 15px var(--glow-primary);
+    }
+    
+    .measurement-overlay {
+      position: absolute;
+      top: calc(var(--spacing-sm) + var(--btn-size) * 2 + var(--spacing-xs) * 2 + var(--spacing-sm));
+      left: var(--spacing-sm);
+      background: var(--bg-elevated);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+      display: none;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      z-index: 15;
+      min-width: 200px;
+      max-width: 240px;
+    }
+    
+    .measurement-overlay.visible {
+      display: block;
+      animation: fadeIn 0.2s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .meas-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: var(--spacing-md);
+      padding-bottom: var(--spacing-sm);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    
+    .meas-header-icon {
+      font-size: 16px;
+    }
+    
+    .meas-header-text {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--accent-primary);
+      letter-spacing: 2px;
+      text-shadow: 0 0 10px var(--glow-primary);
+    }
+    
+    .meas-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    
+    .meas-item {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      border: 1px solid var(--border-subtle);
+    }
+    
+    .meas-item.full-width {
+      grid-column: span 2;
+    }
+    
+    .meas-label {
+      font-size: 8px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    
+    .meas-value {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    
+    .meas-value.highlight {
+      color: var(--accent-primary);
+      text-shadow: 0 0 15px var(--glow-primary);
+    }
+    
+    .meas-unit {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-left: 2px;
+    }
+    
+    .controls-panel {
+      background: linear-gradient(0deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+      border-top: 1px solid var(--border-subtle);
+      padding: var(--spacing-md);
+      position: relative;
+    }
+    
+    .controls-panel::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-primary), var(--accent-secondary), transparent);
+      opacity: 0.4;
+    }
+    
+    .controls-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-sm);
+      width: 100%;
+      padding: var(--spacing-sm);
+      background: var(--bg-tertiary);
+      border: none;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      cursor: pointer;
+      min-height: 36px;
+    }
+    
+    .controls-toggle-icon {
+      font-size: 12px;
+      transition: transform 0.3s;
+    }
+    
+    .controls-panel.expanded .controls-toggle-icon {
+      transform: rotate(180deg);
+    }
+    
+    .fullscreen-controls-toggle {
+      display: none;
+      width: 100%;
+      height: 40px;
+      min-height: 40px;
+      padding: 0 16px;
+      background: transparent;
+      border: none;
+      color: var(--accent-primary);
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: background 0.2s;
+    }
+    
+    .fullscreen-controls-toggle:hover {
+      background: rgba(0, 255, 136, 0.1);
+    }
+    
+    .fullscreen-controls-toggle:active {
+      background: rgba(0, 255, 136, 0.2);
+    }
+    
+    .fullscreen-controls-toggle .toggle-arrow {
+      font-size: 12px;
+      transition: transform 0.3s ease;
+    }
+    
+    .controls-content {
+      display: block;
+    }
+    
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--spacing-md);
+    }
+    
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .control-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    
+    .control-value {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-primary);
+      text-shadow: 0 0 12px var(--glow-primary);
+      background: var(--bg-tertiary);
+      padding: 3px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+    }
+    
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 32px;
+      background: transparent;
+      cursor: pointer;
+      padding: 10px 0;
+    }
+    
+    input[type="range"]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      border: 1px solid var(--border-subtle);
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      border-radius: 50%;
+      box-shadow: 0 0 15px var(--glow-primary), 0 2px 8px rgba(0,0,0,0.3);
+      border: 2px solid var(--bg-primary);
+      margin-top: -8px;
+      transition: transform 0.15s;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+    
+    input[type="range"]::-moz-range-track {
+      width: 100%;
+      height: 6px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+    }
+    
+    input[type="range"]::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      border-radius: 50%;
+      border: 2px solid var(--bg-primary);
+      box-shadow: 0 0 15px var(--glow-primary);
+    }
+    
+    select {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      min-height: var(--touch-min);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300ff88' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+    }
+    
+    select:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+    }
+    
+    .btn-group {
+      display: flex;
+      gap: 2px;
+      background: var(--bg-tertiary);
+      padding: 3px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+    }
+    
+    .btn {
+      flex: 1;
+      padding: 10px;
+      min-height: var(--touch-min);
+      background: transparent;
+      color: var(--text-secondary);
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.2s;
+      position: relative;
+    }
+    
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      opacity: 0;
+      border-radius: inherit;
+      transition: opacity 0.2s;
+    }
+    
+    .btn span {
+      position: relative;
+      z-index: 1;
+    }
+    
+    .btn:active {
+      transform: scale(0.95);
+    }
+    
+    .btn.active {
+      color: var(--bg-primary);
+      box-shadow: 0 4px 15px var(--glow-primary);
+    }
+    
+    .btn.active::before {
+      opacity: 1;
+    }
+    
+    body.fullscreen {
+      background: #000;
+    }
+    
+    body.fullscreen::before {
+      display: none;
+    }
+    
+    body.fullscreen #app {
+      grid-template-rows: 1fr auto;
+    }
+    
+    body.fullscreen header {
+      display: none !important;
+    }
+    
+    body.fullscreen .controls-panel {
+      position: relative;
+      background: rgba(8, 12, 20, 0.95);
+      border-top: 1px solid rgba(0, 255, 136, 0.3);
+      padding: 0;
+      margin: 0;
+      overflow: visible;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    body.fullscreen .controls-panel::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.5), rgba(0, 212, 255, 0.5), transparent);
+    }
+    
+    body.fullscreen .controls-toggle {
+      display: none !important;
+    }
+    
+    body.fullscreen .fullscreen-controls-toggle {
+      display: flex !important;
+    }
+    
+    body.fullscreen .controls-panel.expanded .toggle-arrow {
+      transform: rotate(180deg);
+    }
+    
+    body.fullscreen .controls-content {
+      display: none;
+      padding: 12px 16px 16px 16px;
+      background: rgba(10, 15, 25, 0.98);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    body.fullscreen .controls-panel.expanded .controls-content {
+      display: block;
+    }
+    
+    body.fullscreen .controls-grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    
+    body.fullscreen .control-group {
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    body.fullscreen .control-label {
+      font-size: 9px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    
+    body.fullscreen .control-value {
+      font-size: 11px;
+      padding: 3px 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    
+    body.fullscreen input[type="range"] {
+      height: 28px;
+      padding: 8px 0;
+    }
+    
+    body.fullscreen input[type="range"]::-webkit-slider-runnable-track {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    body.fullscreen input[type="range"]::-webkit-slider-thumb {
+      width: 18px;
+      height: 18px;
+      margin-top: -6px;
+    }
+    
+    body.fullscreen select {
+      min-height: 34px;
+      padding: 6px 10px;
+      font-size: 11px;
+      background-color: rgba(0, 0, 0, 0.3);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    
+    body.fullscreen .btn-group {
+      background: rgba(0, 0, 0, 0.2);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    body.fullscreen .btn {
+      min-height: 34px;
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+    
+    body.fullscreen .fullscreen-exit-btn {
+      display: flex;
+    }
+    
+    body.fullscreen .canvas-buttons .fullscreen-btn {
+      display: none;
+    }
+    
+    body.fullscreen .landscape-stats {
+      display: flex;
+    }
+    
+    body.fullscreen .landscape-controls {
+      display: flex;
+    }
+    
+    body.fullscreen .mode-badge {
+      right: 60px;
+    }
+    
+    @media (orientation: landscape) and (max-height: 500px) {
+      :root {
+        --header-height: 0px;
+        --btn-size: 34px;
+      }
+      
+      header {
+        display: none;
+      }
+      
+      #app {
+        grid-template-rows: 1fr auto;
+      }
+      
+      .landscape-stats {
+        display: flex;
+      }
+      
+      .landscape-controls {
+        display: flex;
+      }
+      
+      .canvas-buttons {
+        top: var(--spacing-xs);
+        left: var(--spacing-xs);
+      }
+      
+      .mode-badge {
+        top: var(--spacing-xs);
+        right: var(--spacing-xs);
+        padding: 4px 10px;
+        font-size: 9px;
+      }
+      
+      .measurement-overlay {
+        top: calc(var(--spacing-xs) + var(--btn-size) * 2 + var(--spacing-xs) * 2 + var(--spacing-sm));
+        left: var(--spacing-xs);
+        min-width: 160px;
+        padding: var(--spacing-sm);
+      }
+      
+      .meas-value {
+        font-size: 14px;
+      }
+      
+      .meas-label {
+        font-size: 7px;
+      }
+      
+      .controls-panel {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        transform: translateY(calc(100% - 36px));
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1000;
+        padding: 0;
+        max-height: 55vh;
+        overflow: hidden;
+      }
+      
+      .controls-panel.expanded {
+        transform: translateY(0);
+        overflow-y: auto;
+      }
+      
+      .controls-toggle {
+        display: flex;
+      }
+      
+      .controls-content {
+        padding: var(--spacing-sm);
+      }
+      
+      .controls-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--spacing-sm);
+      }
+      
+      .control-group {
+        gap: 4px;
+      }
+      
+      .control-label {
+        font-size: 8px;
+      }
+      
+      .control-value {
+        font-size: 10px;
+        padding: 2px 6px;
+      }
+      
+      input[type="range"] {
+        height: 24px;
+        padding: 6px 0;
+      }
+      
+      input[type="range"]::-webkit-slider-thumb {
+        width: 18px;
+        height: 18px;
+        margin-top: -6px;
+      }
+      
+      select, .btn {
+        min-height: 34px;
+        padding: 6px 10px;
+        font-size: 10px;
+      }
+    }
+    
+    @media (orientation: landscape) and (max-height: 380px) {
+      .controls-grid {
+        grid-template-columns: repeat(6, 1fr);
+      }
+      
+      .landscape-stat {
+        padding: 4px 8px;
+        font-size: 10px;
+      }
+      
+      .lc-btn {
+        padding: 6px 10px;
+        font-size: 9px;
+      }
+    }
+    
+    @media (orientation: landscape) and (min-width: 500px) {
+      body.fullscreen .controls-grid {
+        grid-template-columns: repeat(6, 1fr);
+        gap: 8px;
+      }
+      
+      body.fullscreen .fullscreen-controls-toggle {
+        height: 36px;
+        min-height: 36px;
+        font-size: 10px;
+      }
+      
+      body.fullscreen .controls-content {
+        padding: 10px 12px;
+      }
+      
+      body.fullscreen .control-group {
+        padding: 8px;
+      }
+      
+      body.fullscreen .control-label {
+        font-size: 8px;
+      }
+      
+      body.fullscreen .control-value {
+        font-size: 10px;
+        padding: 2px 6px;
+      }
+    }
+    
+    @media (orientation: portrait) and (min-width: 480px) {
+      .controls-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    
+    @media (orientation: portrait) and (min-width: 700px) {
+      .status-text {
+        display: inline;
+      }
+      
+      .header-center {
+        display: flex;
+      }
+      
+      .mobile-stats {
+        display: none;
+      }
+      
+      .controls-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+    
+    @media (min-width: 1000px) {
+      .controls-grid {
+        grid-template-columns: repeat(6, 1fr);
+      }
+      
+      .logo-text h1 {
+        font-size: 18px;
+      }
+    }
+    
+    @supports (padding: env(safe-area-inset-left)) {
+      header {
+        padding-left: max(var(--spacing-lg), env(safe-area-inset-left));
+        padding-right: max(var(--spacing-lg), env(safe-area-inset-right));
+      }
+      
+      .controls-panel {
+        padding-left: max(var(--spacing-md), env(safe-area-inset-left));
+        padding-right: max(var(--spacing-md), env(safe-area-inset-right));
+        padding-bottom: max(var(--spacing-md), env(safe-area-inset-bottom));
+      }
+      
+      .canvas-buttons {
+        left: max(var(--spacing-sm), env(safe-area-inset-left));
+      }
+      
+      .landscape-stats {
+        top: max(var(--spacing-sm), env(safe-area-inset-top));
+      }
+      
+      .fullscreen-exit-btn,
+      .mode-badge {
+        right: max(var(--spacing-sm), env(safe-area-inset-right));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="logo-section">
+        <div class="logo-icon">📡</div>
+        <div class="logo-text">
+          <h1>SMART SCOPE</h1>
+        </div>
+      </div>
+      
+      <div class="header-center">
+        <div class="header-stat">
+          <span class="header-stat-icon">⚡</span>
+          <span class="header-stat-value" id="fps-display">0 FPS</span>
+        </div>
+        <div class="header-stat">
+          <span class="header-stat-icon">📊</span>
+          <span class="header-stat-value secondary" id="samples-display">0</span>
+        </div>
+        <div class="header-stat">
+          <span class="header-stat-icon">👥</span>
+          <span class="header-stat-value tertiary" id="client-count">1</span>
+        </div>
+      </div>
+      
+      <div class="header-right">
+        <div class="mobile-stats">
+          <span class="mobile-stat" id="fps-mobile">0 FPS</span>
+          <span class="mobile-stat clients" id="client-count-mobile">👥 1</span>
+        </div>
+        <div class="connection-status">
+          <div class="status-dot" id="status-dot"></div>
+          <span class="status-text" id="status-text">Connecting...</span>
+        </div>
+      </div>
+    </header>
+    
+    <div class="main-display">
+      <div class="canvas-wrapper">
+        <canvas id="scope"></canvas>
+        
+        <div class="landscape-stats">
+          <span class="landscape-stat" id="ls-fps">0 FPS</span>
+          <span class="landscape-stat secondary" id="ls-samples">0 pts</span>
+          <span class="landscape-stat tertiary" id="ls-clients">👥 1</span>
+          <span class="landscape-stat" id="ls-conn">●</span>
+        </div>
+        
+        <div class="landscape-controls">
+          <button class="lc-btn active" id="lc-time">TIME</button>
+          <button class="lc-btn" id="lc-freq">FFT</button>
+          <button class="lc-btn" id="lc-fullscreen">⛶</button>
+        </div>
+        
+        <div class="canvas-buttons">
+          <button class="canvas-btn meas-btn" id="meas-btn" title="Measurements">📐</button>
+          <button class="canvas-btn fullscreen-btn" id="fullscreen-btn" title="Fullscreen">⛶</button>
+        </div>
+        
+        <button class="canvas-btn fullscreen-exit-btn" id="fullscreen-exit-btn" title="Exit">✕</button>
+        
+        <div class="mode-badge">
+          <div class="mode-dot"></div>
+          <span id="mode-badge-text">TIME</span>
+        </div>
+        
+        <div class="measurement-overlay" id="meas-overlay">
+          <div class="meas-header">
+            <span class="meas-header-icon">📐</span>
+            <span class="meas-header-text">MEASUREMENTS</span>
+          </div>
+          <div class="meas-grid" id="meas-grid">
+            <div class="meas-item full-width">
+              <div class="meas-label">Waiting for data...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="controls-panel" id="controls-panel">
+      <button class="controls-toggle" id="controls-toggle">
+        <span>⚙️ CONTROLS</span>
+        <span class="controls-toggle-icon">▲</span>
+      </button>
+      
+      <button class="fullscreen-controls-toggle" id="fullscreen-controls-toggle">
+        <span>⚙️</span>
+        <span class="toggle-text">CONTROLS</span>
+        <span class="toggle-arrow">▼</span>
+      </button>
+      
+      <div class="controls-content">
+        <div class="controls-grid">
+          <div class="control-group">
+            <div class="control-header">
+              <span class="control-label">Time/Div</span>
+              <span class="control-value" id="timebase-val">100 µs</span>
+            </div>
+            <input type="range" id="timebase" min="10" max="5000" value="100" step="10">
+          </div>
+          
+          <div class="control-group">
+            <div class="control-header">
+              <span class="control-label">Volt/Div</span>
+              <span class="control-value" id="voltage-val">500 mV</span>
+            </div>
+            <input type="range" id="voltage" min="100" max="1000" value="500" step="50">
+          </div>
+          
+          <div class="control-group">
+            <div class="control-header">
+              <span class="control-label">Generator</span>
+              <span class="control-value" id="frequency-val">1.0 kHz</span>
+            </div>
+            <input type="range" id="frequency" min="100" max="50000" value="1000" step="100">
+          </div>
+          
+          <div class="control-group">
+            <div class="control-header">
+              <span class="control-label">Duty</span>
+              <span class="control-value" id="duty-val">50%</span>
+            </div>
+            <input type="range" id="duty" min="10" max="90" value="50" step="5">
+          </div>
+          
+          <div class="control-group">
+            <div class="control-header">
+              <span class="control-label">Mode</span>
+            </div>
+            <select id="acq-mode">
+              <option value="0">Normal</option>
+              <option value="1">Average</option>
+              <option value="2">Peak Detect</option>
+            </select>
+          </div>
+          
+          <div class="control-group">
+            <div class="control-header">
+              <span class="control-label">Domain</span>
+            </div>
+            <div class="btn-group">
+              <button class="btn active" id="btn-time"><span>Time</span></button>
+              <button class="btn" id="btn-freq"><span>FFT</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+    
+    // ==================== CONFIGURATION ====================
+    const CONFIG = {
+      wsReconnectDelay: 2000,
+      wsPingInterval: 5000,
+      fpsUpdateInterval: 1000,
+      labelMargin: { left: 55, bottom: 28, top: 22, right: 12 },
+      demoMode: false,
+      
+      // FREEZE DETECTION - Only reload when frozen
+      freezeCheckInterval: 2000,    // Check every 2 seconds
+      freezeThreshold: 5000,        // Consider frozen after 5 seconds of no frames
+      maxRecoveryAttempts: 2        // Try soft recovery 2 times before hard reload
+    };
+    
+    // ==================== STATE ====================
+    const state = {
+      clientId: null,
+      clientCount: 1,
+      frameCount: 0,
+      fps: 0,
+      lastFpsTime: Date.now(),
+      lastFrameTime: Date.now(),
+      canvasWidth: 0,
+      canvasHeight: 0,
+      displayMode: 0,
+      timebase: 100,
+      voltage: 500,
+      frequency: 1000,
+      duty: 50,
+      acqMode: 0,
+      measEnabled: false,
+      controlsExpanded: false,
+      isLandscape: false,
+      isFullscreen: false,
+      measData: null,
+      fftParams: {
+        sampleRate: 500000,
+        fftSize: 4096,
+        displayBins: 256,
+        maxFreq: 250000,
+        hzPerBin: 122.07
+      },
+      lastWaveform: null,
+      recoveryAttempts: 0,
+      isConnected: false
+    };
+    
+    const colors = {
+      bgTop: '#0a1018',
+      bgBottom: '#050810',
+      grid: 'rgba(0, 255, 136, 0.05)',
+      gridCenter: 'rgba(0, 255, 136, 0.25)',
+      waveform: '#00ff88',
+      waveformGlow: 'rgba(0, 255, 136, 0.6)',
+      waveformCore: 'rgba(200, 255, 220, 0.9)',
+      spectrum: '#00d4ff',
+      spectrumGlow: 'rgba(0, 212, 255, 0.5)',
+      peakColors: ['#00ff88', '#00d4ff', '#a855f7', '#fbbf24', '#ef4444'],
+      labelBg: 'rgba(5, 8, 15, 0.9)',
+      labelText: '#ffffff'
+    };
+    
+    // ==================== DOM ELEMENTS ====================
+    const canvas = document.getElementById('scope');
+    const ctx = canvas.getContext('2d');
+    
+    const el = {
+      statusDot: document.getElementById('status-dot'),
+      statusText: document.getElementById('status-text'),
+      fpsDisplay: document.getElementById('fps-display'),
+      fpsMobile: document.getElementById('fps-mobile'),
+      samplesDisplay: document.getElementById('samples-display'),
+      clientCount: document.getElementById('client-count'),
+      clientCountMobile: document.getElementById('client-count-mobile'),
+      lsFps: document.getElementById('ls-fps'),
+      lsSamples: document.getElementById('ls-samples'),
+      lsClients: document.getElementById('ls-clients'),
+      lsConn: document.getElementById('ls-conn'),
+      lcTime: document.getElementById('lc-time'),
+      lcFreq: document.getElementById('lc-freq'),
+      lcFullscreen: document.getElementById('lc-fullscreen'),
+      measBtn: document.getElementById('meas-btn'),
+      fullscreenBtn: document.getElementById('fullscreen-btn'),
+      fullscreenExitBtn: document.getElementById('fullscreen-exit-btn'),
+      fullscreenControlsToggle: document.getElementById('fullscreen-controls-toggle'),
+      modeBadgeText: document.getElementById('mode-badge-text'),
+      measOverlay: document.getElementById('meas-overlay'),
+      measGrid: document.getElementById('meas-grid'),
+      controlsPanel: document.getElementById('controls-panel'),
+      controlsToggle: document.getElementById('controls-toggle'),
+      timebase: document.getElementById('timebase'),
+      timebaseVal: document.getElementById('timebase-val'),
+      voltage: document.getElementById('voltage'),
+      voltageVal: document.getElementById('voltage-val'),
+      frequency: document.getElementById('frequency'),
+      frequencyVal: document.getElementById('frequency-val'),
+      duty: document.getElementById('duty'),
+      dutyVal: document.getElementById('duty-val'),
+      acqMode: document.getElementById('acq-mode'),
+      btnTime: document.getElementById('btn-time'),
+      btnFreq: document.getElementById('btn-freq')
+    };
+    
+    // ==================== FREEZE DETECTION ====================
+    let freezeCheckInterval = null;
+    
+    function startFreezeDetection() {
+      if (freezeCheckInterval) clearInterval(freezeCheckInterval);
+      
+      freezeCheckInterval = setInterval(function() {
+        // Only check if we should be receiving data
+        if (!state.isConnected && !CONFIG.demoMode) return;
+        
+        const timeSinceLastFrame = Date.now() - state.lastFrameTime;
+        
+        if (timeSinceLastFrame > CONFIG.freezeThreshold) {
+          console.warn('⚠️ Freeze detected! No frames for ' + (timeSinceLastFrame / 1000).toFixed(1) + 's');
+          handleFreeze();
+        }
+      }, CONFIG.freezeCheckInterval);
+    }
+    
+    function handleFreeze() {
+      state.recoveryAttempts++;
+      console.log('Recovery attempt #' + state.recoveryAttempts);
+      
+      if (state.recoveryAttempts <= CONFIG.maxRecoveryAttempts) {
+        // Try soft recovery first
+        softRecover();
+      } else {
+        // Hard reload after max attempts
+        console.log('🔄 Max recovery attempts reached. Reloading page...');
+        location.reload();
+      }
+    }
+    
+    function softRecover() {
+      console.log('Attempting soft recovery...');
+      
+      // 1. Try to force redraw
+      if (state.lastWaveform) {
+        try {
+          resizeCanvas();
+          drawWaveform(state.lastWaveform);
+        } catch (e) {
+          console.error('Redraw failed:', e);
+        }
+      }
+      
+      // 2. Reconnect WebSocket
+      if (ws) {
+        try {
+          ws.close();
+        } catch (e) {}
+      }
+      
+      setTimeout(function() {
+        connectWebSocket();
+      }, 500);
+    }
+    
+    function resetFreezeDetection() {
+      state.lastFrameTime = Date.now();
+      state.recoveryAttempts = 0;
+    }
+    
+    // ==================== WEBSOCKET ====================
+    let ws = null;
+    let pingInterval = null;
+    let reconnectTimeout = null;
+    
+    function connectWebSocket() {
+      if (CONFIG.demoMode || location.protocol === 'file:') {
+        updateConnectionStatus(false);
+        el.statusText.textContent = 'Demo Mode';
+        startDemoMode();
+        return;
+      }
+      
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+      
+      try {
+        ws = new WebSocket('ws://' + location.hostname + '/ws');
+        ws.binaryType = 'arraybuffer';
+        
+        ws.onopen = function() {
+          console.log('WebSocket connected');
+          state.isConnected = true;
+          updateConnectionStatus(true);
+          resetFreezeDetection();
+          
+          if (pingInterval) clearInterval(pingInterval);
+          pingInterval = setInterval(function() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send('PING');
+            }
+          }, CONFIG.wsPingInterval);
+        };
+        
+        ws.onclose = function() {
+          console.log('WebSocket disconnected');
+          state.isConnected = false;
+          updateConnectionStatus(false);
+          cleanup();
+          scheduleReconnect();
+        };
+        
+        ws.onerror = function(err) {
+          console.error('WebSocket error:', err);
+          state.isConnected = false;
+          updateConnectionStatus(false);
+        };
+        
+        ws.onmessage = function(event) {
+          if (typeof event.data === 'string') {
+            handleJsonMessage(event.data);
+          } else {
+            handleBinaryMessage(event.data);
+          }
+        };
+        
+      } catch (err) {
+        console.error('Connection failed:', err);
+        scheduleReconnect();
+      }
+    }
+    
+    function cleanup() {
+      if (pingInterval) {
+        clearInterval(pingInterval);
+        pingInterval = null;
+      }
+    }
+    
+    function scheduleReconnect() {
+      if (!reconnectTimeout) {
+        reconnectTimeout = setTimeout(connectWebSocket, CONFIG.wsReconnectDelay);
+      }
+    }
+    
+    function handleJsonMessage(data) {
+      try {
+        const msg = JSON.parse(data);
+        
+        switch (msg.type) {
+          case 'init':
+            state.clientId = msg.clientId;
+            state.clientCount = msg.clientCount || 1;
+            if (msg.fftParams) Object.assign(state.fftParams, msg.fftParams);
+            if (msg.settings) applySyncedSettings(msg.settings);
+            updateClientCountDisplay();
+            break;
+            
+          case 'state':
+            applySyncedSettings(msg);
+            break;
+            
+          case 'clients':
+            state.clientCount = msg.count || 1;
+            updateClientCountDisplay();
+            break;
+            
+          case 'meas':
+            if (msg.fftParams) Object.assign(state.fftParams, msg.fftParams);
+            state.measData = msg;
+            updateMeasurements();
+            break;
+            
+          case 'pong':
+            break;
+        }
+      } catch (err) {
+        console.error('JSON parse error:', err);
+      }
+    }
+    
+    function handleBinaryMessage(data) {
+      // IMPORTANT: Reset freeze detection on every frame
+      resetFreezeDetection();
+      
+      state.frameCount++;
+      
+      const now = Date.now();
+      if (now - state.lastFpsTime >= CONFIG.fpsUpdateInterval) {
+        state.fps = state.frameCount;
+        state.frameCount = 0;
+        state.lastFpsTime = now;
+        updateFpsDisplay();
+      }
+      
+      const rawData = new Uint8Array(data);
+      if (rawData.length < 6) return;
+      
+      const headerMode = rawData[0];
+      
+      if (headerMode !== state.displayMode) {
+        state.displayMode = headerMode;
+        updateDisplayModeUI();
+        updateMeasurements();
+      }
+      
+      const waveformData = rawData.slice(4);
+      const samples = new Uint16Array(waveformData.buffer, waveformData.byteOffset, waveformData.length / 2);
+      
+      if (samples.length === 0) return;
+      
+      state.lastWaveform = samples;
+      updateSamplesDisplay(samples.length);
+      
+      try {
+        drawWaveform(samples);
+      } catch (error) {
+        console.error('Draw error:', error);
+      }
+    }
+    
+    // ==================== DEMO MODE ====================
+    let demoInterval = null;
+    let demoPhase = 0;
+    
+    function startDemoMode() {
+      if (demoInterval) clearInterval(demoInterval);
+      
+      demoInterval = setInterval(function() {
+        resetFreezeDetection();
+        
+        const samples = generateDemoWaveform();
+        state.lastWaveform = samples;
+        
+        state.frameCount++;
+        const now = Date.now();
+        if (now - state.lastFpsTime >= CONFIG.fpsUpdateInterval) {
+          state.fps = state.frameCount;
+          state.frameCount = 0;
+          state.lastFpsTime = now;
+          updateFpsDisplay();
+        }
+        
+        updateSamplesDisplay(samples.length);
+        
+        try {
+          drawWaveform(samples);
+        } catch (error) {
+          console.error('Demo draw error:', error);
+        }
+        
+        demoPhase += 0.02;
+      }, 50);
+      
+      state.measData = {
+        amp: 1650,
+        freq: state.frequency,
+        period: Math.round(1000000 / state.frequency),
+        vrms: 1165,
+        npeaks: 3,
+        pfreqs: [state.frequency, state.frequency * 2, state.frequency * 3],
+        pmags: [100, 45, 22]
+      };
+      updateMeasurements();
+    }
+    
+    function generateDemoWaveform() {
+      const numSamples = 256;
+      const samples = new Uint16Array(numSamples);
+      
+      if (state.displayMode === 0) {
+        const cycles = 3;
+        for (let i = 0; i < numSamples; i++) {
+          const t = (i / numSamples) * cycles * 2 * Math.PI + demoPhase;
+          const noise = (Math.random() - 0.5) * 50;
+          samples[i] = Math.round(2048 + 1800 * Math.sin(t) + noise);
+        }
+      } else {
+        for (let i = 0; i < numSamples; i++) {
+          const freq = (i / numSamples) * state.fftParams.maxFreq;
+          let mag = 0;
+          
+          const f0 = state.frequency;
+          if (Math.abs(freq - f0) < 2000) {
+            mag = 4000 * Math.exp(-Math.pow(freq - f0, 2) / 500000);
+          }
+          if (Math.abs(freq - f0 * 2) < 2000) {
+            mag += 1800 * Math.exp(-Math.pow(freq - f0 * 2, 2) / 500000);
+          }
+          if (Math.abs(freq - f0 * 3) < 2000) {
+            mag += 900 * Math.exp(-Math.pow(freq - f0 * 3, 2) / 500000);
+          }
+          
+          mag += Math.random() * 100;
+          samples[i] = Math.round(mag);
+        }
+      }
+      
+      return samples;
+    }
+    
+    // ==================== SYNC HANDLING ====================
+    function applySyncedSettings(s) {
+      let newMode = s.displayMode;
+      if (newMode === undefined && s.mode !== undefined) {
+        newMode = (s.mode === 'fft' || s.mode === 1) ? 1 : 0;
+      }
+      if (newMode !== undefined && newMode !== state.displayMode) {
+        state.displayMode = newMode;
+        updateDisplayModeUI();
+      }
+      
+      if (s.timebase !== undefined && s.timebase !== state.timebase) {
+        state.timebase = s.timebase;
+        el.timebase.value = s.timebase;
+        el.timebaseVal.textContent = formatTime(s.timebase);
+      }
+      
+      if (s.voltage !== undefined && s.voltage !== state.voltage) {
+        state.voltage = s.voltage;
+        el.voltage.value = s.voltage;
+        el.voltageVal.textContent = s.voltage + ' mV';
+      }
+      
+      if (s.frequency !== undefined && s.frequency !== state.frequency) {
+        state.frequency = s.frequency;
+        el.frequency.value = s.frequency;
+        el.frequencyVal.textContent = formatFreq(s.frequency);
+      }
+      
+      if (s.duty !== undefined && s.duty !== state.duty) {
+        state.duty = s.duty;
+        el.duty.value = s.duty;
+        el.dutyVal.textContent = s.duty + '%';
+      }
+      
+      if (s.acqMode !== undefined && s.acqMode !== state.acqMode) {
+        state.acqMode = s.acqMode;
+        el.acqMode.value = s.acqMode;
+      }
+      
+      if (state.lastWaveform) drawWaveform(state.lastWaveform);
+      updateMeasurements();
+    }
+    
+    // ==================== UI UPDATES ====================
+    function updateConnectionStatus(connected) {
+      el.statusDot.classList.toggle('connected', connected);
+      el.statusText.textContent = connected ? 'Connected' : 'Disconnected';
+      el.lsConn.textContent = connected ? '●' : '○';
+      el.lsConn.style.color = connected ? 'var(--accent-primary)' : 'var(--accent-danger)';
+    }
+    
+    function updateFpsDisplay() {
+      const text = state.fps + ' FPS';
+      el.fpsDisplay.textContent = text;
+      el.fpsMobile.textContent = text;
+      el.lsFps.textContent = text;
+    }
+    
+    function updateSamplesDisplay(count) {
+      el.samplesDisplay.textContent = count;
+      el.lsSamples.textContent = count + ' pts';
+    }
+    
+    function updateClientCountDisplay() {
+      el.clientCount.textContent = state.clientCount;
+      el.clientCountMobile.textContent = '👥 ' + state.clientCount;
+      el.lsClients.textContent = '👥 ' + state.clientCount;
+    }
+    
+    function updateDisplayModeUI() {
+      const isTime = state.displayMode === 0;
+      el.btnTime.classList.toggle('active', isTime);
+      el.btnFreq.classList.toggle('active', !isTime);
+      el.lcTime.classList.toggle('active', isTime);
+      el.lcFreq.classList.toggle('active', !isTime);
+      el.modeBadgeText.textContent = isTime ? 'TIME' : 'FFT';
+    }
+    
+    function updateMeasurements() {
+      if (!state.measData) {
+        el.measGrid.innerHTML = '<div class="meas-item full-width"><div class="meas-label">Waiting for data...</div></div>';
+        return;
+      }
+      const d = state.measData;
+      
+      const html = state.displayMode === 0 ? `
+        <div class="meas-item">
+          <div class="meas-label">Amplitude</div>
+          <div class="meas-value highlight">${d.amp || '--'}<span class="meas-unit">mVpp</span></div>
+        </div>
+        <div class="meas-item">
+          <div class="meas-label">Frequency</div>
+          <div class="meas-value highlight">${formatFreq(d.freq || 0)}</div>
+        </div>
+        <div class="meas-item">
+          <div class="meas-label">Period</div>
+          <div class="meas-value">${formatTime(d.period || 0)}</div>
+        </div>
+        <div class="meas-item">
+          <div class="meas-label">Vrms</div>
+          <div class="meas-value">${d.vrms || '--'}<span class="meas-unit">mV</span></div>
+        </div>
+      ` : `
+        <div class="meas-item full-width">
+          <div class="meas-label">Fundamental</div>
+          <div class="meas-value highlight">${formatFreq(d.freq || 0)}</div>
+        </div>
+        <div class="meas-item">
+          <div class="meas-label">Peaks</div>
+          <div class="meas-value">${d.npeaks || 0}</div>
+        </div>
+        <div class="meas-item">
+          <div class="meas-label">Amplitude</div>
+          <div class="meas-value">${d.amp || '--'}<span class="meas-unit">mV</span></div>
+        </div>
+      `;
+      
+      el.measGrid.innerHTML = html;
+    }
+    
+    // ==================== USER ACTIONS ====================
+    function setDisplayMode(mode) {
+      if (state.displayMode === mode) return;
+      state.displayMode = mode;
+      updateDisplayModeUI();
+      sendCommand('X:' + mode);
+      updateMeasurements();
+      if (state.lastWaveform) drawWaveform(state.lastWaveform);
+    }
+    
+    function setTimebase(value) {
+      state.timebase = value;
+      el.timebaseVal.textContent = formatTime(value);
+      sendCommand('T:' + value);
+    }
+    
+    function setVoltage(value) {
+      state.voltage = value;
+      el.voltageVal.textContent = value + ' mV';
+      sendCommand('V:' + value);
+      if (state.lastWaveform) drawWaveform(state.lastWaveform);
+    }
+    
+    function setFrequency(value) {
+      state.frequency = value;
+      el.frequencyVal.textContent = formatFreq(value);
+      sendCommand('F:' + value);
+      
+      if (CONFIG.demoMode && state.measData) {
+        state.measData.freq = value;
+        state.measData.period = Math.round(1000000 / value);
+        state.measData.pfreqs = [value, value * 2, value * 3];
+        updateMeasurements();
+      }
+    }
+    
+    function setDuty(value) {
+      state.duty = value;
+      el.dutyVal.textContent = value + '%';
+      sendCommand('D:' + value);
+    }
+    
+    function setAcqMode(value) {
+      state.acqMode = parseInt(value);
+      sendCommand('M:' + value);
+    }
+    
+    function sendCommand(cmd) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(cmd);
+      }
+    }
+    
+    function toggleMeasurements() {
+      state.measEnabled = !state.measEnabled;
+      el.measBtn.classList.toggle('active', state.measEnabled);
+      el.measOverlay.classList.toggle('visible', state.measEnabled);
+      sendCommand('E:' + (state.measEnabled ? '1' : '0'));
+    }
+    
+    // ==================== FULLSCREEN ====================
+    function enterFullscreen() {
+      state.isFullscreen = true;
+      document.body.classList.add('fullscreen');
+      el.controlsPanel.classList.remove('expanded');
+      state.controlsExpanded = false;
+      
+      const elem = document.documentElement;
+      const request = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.msRequestFullscreen;
+      if (request) request.call(elem).catch(function() {});
+      
+      setTimeout(resizeCanvas, 100);
+    }
+    
+    function exitFullscreen() {
+      state.isFullscreen = false;
+      document.body.classList.remove('fullscreen');
+      el.controlsPanel.classList.remove('expanded');
+      state.controlsExpanded = false;
+      
+      const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      if (exit && document.fullscreenElement) exit.call(document).catch(function() {});
+      
+      setTimeout(resizeCanvas, 100);
+    }
+    
+    function toggleFullscreen() {
+      state.isFullscreen ? exitFullscreen() : enterFullscreen();
+    }
+    
+    function toggleFullscreenControls() {
+      state.controlsExpanded = !state.controlsExpanded;
+      el.controlsPanel.classList.toggle('expanded', state.controlsExpanded);
+    }
+    
+    function toggleControlsPanel() {
+      state.controlsExpanded = !state.controlsExpanded;
+      el.controlsPanel.classList.toggle('expanded', state.controlsExpanded);
+    }
+    
+    // ==================== ORIENTATION ====================
+    function checkOrientation() {
+      const was = state.isLandscape;
+      state.isLandscape = window.innerWidth > window.innerHeight && window.innerHeight < 500;
+      
+      if (was && !state.isLandscape) {
+        state.controlsExpanded = false;
+        el.controlsPanel.classList.remove('expanded');
+      }
+    }
+    
+    // ==================== CANVAS ====================
+    function resizeCanvas() {
+      const wrapper = canvas.parentElement;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      
+      canvas.width = wrapper.clientWidth * dpr;
+      canvas.height = wrapper.clientHeight * dpr;
+      canvas.style.width = wrapper.clientWidth + 'px';
+      canvas.style.height = wrapper.clientHeight + 'px';
+      
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      
+      state.canvasWidth = wrapper.clientWidth;
+      state.canvasHeight = wrapper.clientHeight;
+      
+      if (state.lastWaveform) {
+        try {
+          drawWaveform(state.lastWaveform);
+        } catch (e) {
+          console.error('Draw error on resize:', e);
+        }
+      }
+    }
+    
+    // ==================== HELPERS ====================
+    function formatFreq(hz) {
+      if (!hz || hz === 0) return '-- Hz';
+      if (hz >= 1000000) return (hz / 1000000).toFixed(2) + ' MHz';
+      if (hz >= 1000) return (hz / 1000).toFixed(1) + ' kHz';
+      return Math.round(hz) + ' Hz';
+    }
+    
+    function formatTime(us) {
+      if (!us || us === 0) return '-- µs';
+      if (us >= 1000) return (us / 1000).toFixed(1) + ' ms';
+      return us + ' µs';
+    }
+    
+    function addWheelSupport(slider, handler) {
+      slider.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        const delta = Math.sign(e.deltaY);
+        const step = parseFloat(slider.step) || 1;
+        let val = parseFloat(slider.value) - delta * step;
+        val = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), val));
+        slider.value = Math.round(val / step) * step;
+        handler(parseFloat(slider.value));
+      }, { passive: false });
+    }
+    
+    const throttleTimers = {};
+    
+    function throttle(key, callback, delay) {
+      const now = Date.now();
+      if (!throttleTimers[key] || (now - throttleTimers[key]) >= delay) {
+        throttleTimers[key] = now;
+        callback();
+      }
+    }
+    
+    function debounce(callback, delay) {
+      let timer;
+      return function() {
+        const args = arguments;
+        const context = this;
+        clearTimeout(timer);
+        timer = setTimeout(function() {
+          callback.apply(context, args);
+        }, delay);
+      };
+    }
+    
+    const sendFinalFrequency = debounce(function(val) { sendCommand('F:' + val); }, 200);
+    const sendFinalTimebase = debounce(function(val) { sendCommand('T:' + val); }, 200);
+    const sendFinalDuty = debounce(function(val) { sendCommand('D:' + val); }, 200);
+    
+    // ==================== DRAWING ====================
+    function drawWaveform(samples) {
+      try {
+        const w = state.canvasWidth;
+        const h = state.canvasHeight;
+        
+        if (w === 0 || h === 0) return;
+        
+        const bg = ctx.createLinearGradient(0, 0, 0, h);
+        bg.addColorStop(0, colors.bgTop);
+        bg.addColorStop(1, colors.bgBottom);
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, w, h);
+        
+        const vignette = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, Math.max(w, h) * 0.7);
+        vignette.addColorStop(0, 'transparent');
+        vignette.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
+        ctx.fillStyle = vignette;
+        ctx.fillRect(0, 0, w, h);
+        
+        drawGrid(w, h);
+        
+        if (state.displayMode === 0) {
+          drawTimeWaveform(samples, w, h);
+          drawTimeLabels(w, h);
+        } else {
+          drawFreqSpectrum(samples, w, h);
+          drawFreqLabels(w, h);
+        }
+      } catch (error) {
+        console.error('drawWaveform error:', error);
+      }
+    }
+    
+    function drawGrid(w, h) {
+      const hDivs = 8, vDivs = 10;
+      const hStep = h / hDivs, vStep = w / vDivs;
+      
+      ctx.strokeStyle = colors.grid;
+      ctx.lineWidth = 1;
+      
+      for (let i = 0; i <= hDivs; i++) {
+        const y = Math.round(i * hStep) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+      
+      for (let i = 0; i <= vDivs; i++) {
+        const x = Math.round(i * vStep) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      
+      if (state.displayMode === 0) {
+        ctx.save();
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(0, 255, 136, 0.3)';
+        ctx.strokeStyle = colors.gridCenter;
+        
+        ctx.beginPath();
+        ctx.moveTo(0, Math.round(h/2) + 0.5);
+        ctx.lineTo(w, Math.round(h/2) + 0.5);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(Math.round(w/2) + 0.5, 0);
+        ctx.lineTo(Math.round(w/2) + 0.5, h);
+        ctx.stroke();
+        
+        ctx.restore();
+      }
+    }
+    
+    function drawTimeWaveform(samples, w, h) {
+      const voltScale = 500 / state.voltage;
+      const len = samples.length;
+      const maxPts = Math.min(len, Math.max(800, w * 2));
+      const step = len / maxPts;
+      
+      const pts = [];
+      for (let i = 0; i < maxPts; i++) {
+        const idx = Math.floor(i * step);
+        const x = (i / (maxPts - 1)) * w;
+        const norm = (samples[idx] - 2048) / 2048;
+        const y = h / 2 - norm * (h / 2) * voltScale;
+        pts.push({ x: x, y: Math.max(0, Math.min(h, y)) });
+      }
+      
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, h / 2);
+      for (let i = 0; i < pts.length; i++) {
+        ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.lineTo(pts[pts.length - 1].x, h / 2);
+      ctx.closePath();
+      
+      const fill = ctx.createLinearGradient(0, 0, 0, h);
+      fill.addColorStop(0, 'rgba(0, 255, 136, 0.12)');
+      fill.addColorStop(0.5, 'rgba(0, 255, 136, 0.02)');
+      fill.addColorStop(1, 'rgba(0, 255, 136, 0.12)');
+      ctx.fillStyle = fill;
+      ctx.fill();
+      
+      ctx.save();
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = colors.waveformGlow;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.strokeStyle = colors.waveform;
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.restore();
+      
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.strokeStyle = colors.waveformCore;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+    
+    function drawFreqSpectrum(samples, w, h) {
+      const len = samples.length;
+      if (len === 0) return;
+      
+      const barW = Math.max(w / len, 2);
+      let maxVal = 1;
+      for (let i = 0; i < len; i++) {
+        if (samples[i] > maxVal) maxVal = samples[i];
+      }
+      
+      for (let i = 0; i < len; i++) {
+        const norm = samples[i] / maxVal;
+        const barH = norm * h * 0.85;
+        const x = i * (w / len);
+        const y = h - barH;
+        
+        const grad = ctx.createLinearGradient(x, h, x, y);
+        grad.addColorStop(0, 'rgba(0, 180, 255, 0.25)');
+        grad.addColorStop(0.5, 'rgba(0, 212, 255, 0.55)');
+        grad.addColorStop(1, 'rgba(168, 85, 247, 0.85)');
+        
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, Math.max(barW - 1, 1), barH);
+      }
+      
+      ctx.save();
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = colors.spectrumGlow;
+      ctx.beginPath();
+      for (let i = 0; i < len; i++) {
+        const x = i * (w / len) + barW / 2;
+        const y = h - (samples[i] / maxVal) * h * 0.85;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = colors.spectrum;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+      
+      if (state.measData && state.measData.pfreqs && state.measData.npeaks > 0) {
+        const d = state.measData;
+        const hzPerBin = state.fftParams.hzPerBin || 122.07;
+        const binStep = (state.fftParams.fftSize ? state.fftParams.fftSize / 2 : 2048) / len;
+        const maxMag = (d.pmags && d.pmags[0] > 0) ? d.pmags[0] : 1;
+        
+        for (let i = 0; i < d.npeaks && i < 5; i++) {
+          const freq = d.pfreqs[i];
+          if (!freq || freq <= 0) continue;
+          
+          const fftBin = freq / hzPerBin;
+          const displayBin = fftBin / binStep;
+          const x = displayBin * (w / len);
+          
+          if (x < 0 || x > w) continue;
+          
+          const displayBinIdx = Math.min(Math.max(0, Math.floor(displayBin)), len - 1);
+          const sampleVal = samples[displayBinIdx];
+          const y = h - (sampleVal / maxVal) * h * 0.85;
+          const clampedY = Math.max(45, Math.min(h - 25, y));
+          
+          const mag = (d.pmags && d.pmags[i]) ? d.pmags[i] : 0;
+          const normPercent = Math.round((mag / maxMag) * 100);
+          const color = colors.peakColors[i];
+          const radius = 5 + (normPercent / 100) * 4;
+          
+          ctx.save();
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = color;
+          ctx.beginPath();
+          ctx.arc(x, clampedY, radius, 0, Math.PI * 2);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(x, clampedY, 3, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+          ctx.restore();
+          
+          const freqLabel = formatFreq(freq);
+          const magLabel = normPercent + '%';
+          
+          ctx.font = 'bold 12px "Roboto Mono", monospace';
+          const freqWidth = ctx.measureText(freqLabel).width;
+          ctx.font = 'bold 10px "Roboto Mono", monospace';
+          const magWidth = ctx.measureText(magLabel).width;
+          
+          const boxWidth = Math.max(freqWidth, magWidth) + 16;
+          const boxHeight = 36;
+          
+          let lx = x;
+          if (lx - boxWidth/2 < 10) lx = boxWidth/2 + 10;
+          if (lx + boxWidth/2 > w - 10) lx = w - boxWidth/2 - 10;
+          const ly = clampedY - radius - boxHeight/2 - 8;
+          
+          ctx.save();
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+          ctx.shadowBlur = 10;
+          ctx.shadowOffsetY = 3;
+          const bgGrad = ctx.createLinearGradient(lx - boxWidth/2, ly - boxHeight/2, lx - boxWidth/2, ly + boxHeight/2);
+          bgGrad.addColorStop(0, 'rgba(15, 22, 35, 0.95)');
+          bgGrad.addColorStop(1, 'rgba(8, 12, 20, 0.98)');
+          ctx.fillStyle = bgGrad;
+          ctx.beginPath();
+          ctx.roundRect(lx - boxWidth/2, ly - boxHeight/2, boxWidth, boxHeight, 6);
+          ctx.fill();
+          ctx.restore();
+          
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(lx - boxWidth/2, ly - boxHeight/2, boxWidth, boxHeight, 6);
+          ctx.stroke();
+          
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(lx - boxWidth/2 + 6, ly - boxHeight/2);
+          ctx.lineTo(lx + boxWidth/2 - 6, ly - boxHeight/2);
+          ctx.stroke();
+          
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          
+          ctx.save();
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 10;
+          ctx.font = 'bold 12px "Roboto Mono", monospace';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(freqLabel, lx, ly - 6);
+          ctx.restore();
+          
+          ctx.font = 'bold 12px "Roboto Mono", monospace';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(freqLabel, lx, ly - 6);
+          
+          ctx.save();
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 6;
+          ctx.font = 'bold 10px "Roboto Mono", monospace';
+          ctx.fillStyle = (normPercent === 100) ? color : 'rgba(255, 255, 255, 0.85)';
+          ctx.fillText(magLabel, lx, ly + 8);
+          ctx.restore();
+          
+          ctx.strokeStyle = color + '60';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.moveTo(x, clampedY - radius - 2);
+          ctx.lineTo(x, ly + boxHeight/2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+      }
+    }
+    
+    function drawLabel(text, x, y, align) {
+      align = align || 'left';
+      ctx.font = 'bold 12px monospace';
+      const tw = ctx.measureText(text).width;
+      const pad = 5;
+      let lx = x;
+      if (align === 'center') lx = x - tw / 2;
+      else if (align === 'right') lx = x - tw;
+      ctx.fillStyle = colors.labelBg;
+      ctx.beginPath();
+      ctx.roundRect(lx - pad, y - 10, tw + pad * 2, 20, 4);
+      ctx.fill();
+      ctx.fillStyle = colors.labelText;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, lx, y);
+    }
+    
+    function drawTimeLabels(w, h) {
+      const m = CONFIG.labelMargin;
+      drawLabel('+' + (state.voltage * 4) + 'mV', m.left, m.top + 5);
+      drawLabel('0V', m.left, h / 2);
+      drawLabel('-' + (state.voltage * 4) + 'mV', m.left, h - m.bottom - 5);
+      drawLabel('0', m.left, h - m.bottom + 15);
+      drawLabel(formatTime(state.timebase * 5), w / 2, h - m.bottom + 15, 'center');
+      drawLabel(formatTime(state.timebase * 10), w - m.right, h - m.bottom + 15, 'right');
+    }
+    
+    function drawFreqLabels(w, h) {
+      const maxFreq = state.fftParams.maxFreq;
+      const m = CONFIG.labelMargin;
+      drawLabel('Magnitude', m.left, m.top + 5);
+      drawLabel('0 Hz', m.left, h - m.bottom + 15);
+      drawLabel(formatFreq(maxFreq / 2), w / 2, h - m.bottom + 15, 'center');
+      drawLabel(formatFreq(maxFreq), w - m.right, h - m.bottom + 15, 'right');
+    }
+    
+    // ==================== EVENT LISTENERS ====================
+    function setupEventListeners() {
+      el.btnTime.addEventListener('click', function() { setDisplayMode(0); });
+      el.btnFreq.addEventListener('click', function() { setDisplayMode(1); });
+      el.lcTime.addEventListener('click', function() { setDisplayMode(0); });
+      el.lcFreq.addEventListener('click', function() { setDisplayMode(1); });
+      
+      el.fullscreenBtn.addEventListener('click', enterFullscreen);
+      el.fullscreenExitBtn.addEventListener('click', exitFullscreen);
+      el.lcFullscreen.addEventListener('click', toggleFullscreen);
+      
+      el.measBtn.addEventListener('click', toggleMeasurements);
+      el.controlsToggle.addEventListener('click', toggleControlsPanel);
+      
+      el.fullscreenControlsToggle.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFullscreenControls();
+      });
+      
+      canvas.addEventListener('click', function() {
+        if ((state.isLandscape || state.isFullscreen) && state.controlsExpanded) {
+          state.controlsExpanded = false;
+          el.controlsPanel.classList.remove('expanded');
+        }
+      });
+      
+      document.addEventListener('fullscreenchange', function() {
+        if (!document.fullscreenElement && state.isFullscreen) {
+          state.isFullscreen = false;
+          document.body.classList.remove('fullscreen');
+          el.controlsPanel.classList.remove('expanded');
+          state.controlsExpanded = false;
+          resizeCanvas();
+        }
+      });
+      
+      document.addEventListener('webkitfullscreenchange', function() {
+        if (!document.webkitFullscreenElement && state.isFullscreen) {
+          state.isFullscreen = false;
+          document.body.classList.remove('fullscreen');
+          el.controlsPanel.classList.remove('expanded');
+          state.controlsExpanded = false;
+          resizeCanvas();
+        }
+      });
+      
+      el.timebase.addEventListener('input', function(e) {
+        var val = parseInt(e.target.value);
+        state.timebase = val;
+        el.timebaseVal.textContent = formatTime(val);
+        throttle('T', function() { sendCommand('T:' + val); }, 150);
+        sendFinalTimebase(val);
+      });
+      
+      el.voltage.addEventListener('input', function(e) {
+        setVoltage(parseInt(e.target.value));
+      });
+      
+      el.frequency.addEventListener('input', function(e) {
+        var val = parseInt(e.target.value);
+        state.frequency = val;
+        el.frequencyVal.textContent = formatFreq(val);
+        throttle('F', function() { sendCommand('F:' + val); }, 150);
+        sendFinalFrequency(val);
+      });
+      
+      el.duty.addEventListener('input', function(e) {
+        var val = parseInt(e.target.value);
+        state.duty = val;
+        el.dutyVal.textContent = val + '%';
+        throttle('D', function() { sendCommand('D:' + val); }, 150);
+        sendFinalDuty(val);
+      });
+      
+      el.acqMode.addEventListener('change', function(e) {
+        setAcqMode(e.target.value);
+      });
+      
+      addWheelSupport(el.timebase, setTimebase);
+      addWheelSupport(el.voltage, setVoltage);
+      addWheelSupport(el.frequency, setFrequency);
+      addWheelSupport(el.duty, setDuty);
+      
+      window.addEventListener('resize', function() {
+        checkOrientation();
+        resizeCanvas();
+      });
+      
+      window.addEventListener('orientationchange', function() {
+        setTimeout(function() {
+          checkOrientation();
+          resizeCanvas();
+        }, 150);
+      });
+      
+      // Recover when tab becomes visible
+      document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+          resetFreezeDetection();
+          if (state.lastWaveform) {
+            try {
+              drawWaveform(state.lastWaveform);
+            } catch (e) {}
+          }
+        }
+      });
+    }
+    
+    // ==================== INITIALIZATION ====================
+    function init() {
+      console.log('Smart Oscilloscope Pro - Initializing...');
+      console.log('Freeze detection: ' + CONFIG.freezeThreshold + 'ms threshold, ' + CONFIG.maxRecoveryAttempts + ' soft attempts before reload');
+      
+      el.timebaseVal.textContent = formatTime(state.timebase);
+      el.voltageVal.textContent = state.voltage + ' mV';
+      el.frequencyVal.textContent = formatFreq(state.frequency);
+      el.dutyVal.textContent = state.duty + '%';
+      
+      setupEventListeners();
+      checkOrientation();
+      resizeCanvas();
+      drawWaveform(new Uint16Array([2048]));
+      
+      // Start freeze detection
+      startFreezeDetection();
+      
+      connectWebSocket();
+      
+      console.log('Initialization complete');
+    }
+    
+    init();
+  </script>
+</body>
+</html>

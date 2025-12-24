@@ -1,6 +1,6 @@
 # Smart Wireless Oscilloscope
 
-> Dual-MCU oscilloscope with real-time FFT, auto-ranging analog front end, and wireless browser-based display.
+> No software. No cables. Connect to WiFi, open browser, measure signals.
 
 ![Status](https://img.shields.io/badge/status-working_prototype-green)
 ![MCU](https://img.shields.io/badge/MCU-STM32F4%20%2B%20ESP32-blue)
@@ -13,18 +13,77 @@
 
 ---
 
+## The Problem
+
+Traditional oscilloscopes require dedicated software, USB cables, driver configuration, and being physically next to the device. Their features are limited by fixed buttons and hardcoded firmware.
+
+---
+
+## The Solution
+
+```mermaid
+flowchart LR
+    SCOPE["Oscilloscope"] -->|"WiFi"| PHONE["Phone"]
+    SCOPE -->|"WiFi"| TABLET["Tablet"]
+    SCOPE -->|"WiFi"| PC["PC"]
+
+    style SCOPE fill:#e7f5ff,stroke:#339af0
+```
+
+Power on → Connect to WiFi → Open browser → Measure.
+
+**No software. No cables. No drivers.**
+
+---
+
+## Why Web-Based Matters
+
+```mermaid
+flowchart LR
+    subgraph TRAD["TRADITIONAL SCOPE"]
+        B["Fixed Buttons"] --> F["Fixed Features"]
+    end
+
+    subgraph THIS["THIS SCOPE"]
+        W["Web Interface"] --> U["Unlimited Features"]
+    end
+
+    style TRAD fill:#ffe0e0,stroke:#ff6b6b
+    style THIS fill:#d4edda,stroke:#28a745
+```
+
+The hardware is the platform. The web interface is where intelligence lives.
+
+**Current features:** Auto-ranging with SNR optimization, FFT peak detection, auto-measurements, adaptive streaming, multi-client viewing (8 simultaneous)
+
+**Future additions (no hardware changes):** Protocol decoding, cloud logging, automated testing, remote lab access, AI-assisted anomaly detection
+
+---
+
 ## Specifications
 
 | Parameter | Value |
 |-----------|-------|
 | Sample Rate | 1 MSPS |
 | Resolution | 12-bit |
-| Bandwidth | DC — 500 kHz |
-| Input Range | ±137 mV to ±26 V (32 auto-selected ranges) |
-| Input Impedance | 100 kΩ — 1 MΩ (range-dependent) |
-| FFT | 4096-point |
-| Connectivity | WiFi AP + WebSocket |
-| Display | 128×64 OLED + Browser |
+| Bandwidth | DC — 500 kHz (flat across all gains) |
+| Input Range | ±137 mV to ±26 V (auto-selected) |
+| FFT | 4096-point, top 5 peaks detected |
+| Generator | PWM 1 Hz – 100 kHz, 1–99% duty |
+| Display | Browser + 128×64 OLED |
+
+---
+
+## Smart Features
+
+| Feature | Description |
+|---------|-------------|
+| Auto-ranging | 32 gain settings, optimizes for best SNR |
+| FFT peak detection | Identifies top 5 frequency components on spectrum |
+| Auto-measurements | Real-time frequency, Vpp, Vrms, duty cycle |
+| Adaptive streaming | Adjusts frame rate (20/7/1 FPS) based on client load |
+| Safe boot | Hardware pull-downs force max attenuation at power-on |
+| Auto-recovery | Detects frozen clients, reconnects automatically |
 
 ---
 
@@ -33,25 +92,31 @@
 ```mermaid
 flowchart TB
     subgraph ANALOG["ANALOG FRONT END"]
-        PROBE["BNC Input<br>±26V max"] --> AFE["AFE<br>32 Auto-Ranges"]
+        PROBE["BNC ±26V"] --> ATTEN["Attenuator"]
+        ATTEN --> SHIFT["Level Shift"]
+        SHIFT --> PGA["PGA"]
+        PGA --> PROT["Protection"]
     end
 
     subgraph STM32["STM32F4 @ 100 MHz"]
-        ADC["ADC 12-bit<br>1 MSPS"] --> DSP["DSP<br>FFT | Measure"]
+        ADC["ADC 1 MSPS"] --> DSP["FFT + Measure"]
         DSP --> OLED["OLED"]
+        DSP --> RANGE["Auto-Range"]
     end
 
     subgraph ESP32["ESP32 @ 240 MHz"]
-        SPI_S["SPI"] --> WS["WebSocket"]
+        WS["WebSocket Server"]
     end
 
     subgraph CLIENT["BROWSER"]
-        UI["Phone / Tablet / PC"]
+        UI["Any Device"]
     end
 
-    AFE --> ADC
-    DSP ==>|"Waveform<br>SPI @ 6.25 MHz"| SPI_S
-    DSP <-->|"Measurements + Commands<br>UART 115200"| WS
+    PROT --> ADC
+    RANGE -.->|"Relay Control"| ATTEN
+    RANGE -.->|"Mux Control"| PGA
+    DSP ==>|"Waveform<br>SPI + DMA"| WS
+    DSP <-->|"Measurements<br>UART"| WS
     WS <-->|"WiFi AP"| UI
 
     style ANALOG fill:#fff3cd,stroke:#ffc107
@@ -60,205 +125,118 @@ flowchart TB
     style CLIENT fill:#d3f9d8,stroke:#40c057
 ```
 
-**Dual-MCU rationale:**
-- **STM32F4**: Real-time sampling and DSP — timing-critical, cannot tolerate WiFi stack jitter
-- **ESP32**: Wireless connectivity — creates WiFi AP, streams data via WebSocket at 20 FPS
-
-No router needed. No software installation. Connect to the oscilloscope's WiFi and open a browser.
-
-<details>
-<summary>Power Sequencing</summary>
-
-```mermaid
-flowchart LR
-    PWR["Power On"] --> STM["STM32<br>boots first<br>~30 ms"]
-    STM --> OLED["OLED<br>via I2C<br>~200 ms"]
-    PWR --> ESP["ESP32<br>boots parallel<br>~1000 ms"]
-    OLED --> READY["System Ready<br>~1.7 s"]
-    ESP --> READY
-
-    style STM fill:#e7f5ff,stroke:#339af0
-    style OLED fill:#d3f9d8,stroke:#40c057
-    style ESP fill:#ffe8cc,stroke:#fd7e14
-    style READY fill:#d3f9d8,stroke:#40c057
-```
-
-| Event | Time |
-|-------|------|
-| STM32 GPIO safe | ~30 ms |
-| OLED splash | ~200 ms |
-| ESP32 WiFi ready | ~1000 ms |
-| System ready | ~1.7 s |
-
-</details>
+| Component | Role |
+|-----------|------|
+| STM32F411 | Sampling, DSP, measurements, AFE control |
+| ESP32 | WiFi AP, WebSocket streaming, web UI hosting |
+| Dual-MCU | Isolates timing-critical DSP from WiFi jitter |
 
 ---
-
-## Features
-
-- **Wireless Display**: Access from any browser — phone, tablet, or PC
-- **Auto-Ranging**: 32 gain settings, hardware-safe boot, 10 ms adaptation
-- **Acquisition**: Timer-triggered ADC with DMA (Normal, Average, Peak Detect)
-- **Analysis**: Real-time 4096-point FFT, auto-measurements (Freq, Vpp, Vrms, Duty)
-- **Generator**: PWM output 1 Hz — 100 kHz, variable duty cycle
-- **Local Display**: 128×64 OLED for standalone operation
-## Implementation Details
-
-### STM32F411 (Signal Acquisition & DSP)
-| Category | Implementation |
-|----------|----------------|
-| **Peripherals** | ADC1+DMA (1 MSPS max), TIM2 (ADC trigger), TIM3 (PWM gen), SPI2+DMA (ESP32), UART2 (commands), I2C1 (OLED) |
-| **Architecture** | Event-driven superloop with flags (`adc_ready`, `spi_busy`, `cmd_ready`) |
-| **Sample Rate** | Dynamic TIM2 reconfiguration: 10 Hz–1 MSPS based on timebase |
-| **Signal Processing** | ARM CMSIS DSP: 4096-pt FFT, Hanning window, EMA filtering (α=0.2) |
-| **Measurements** | Zero-crossing frequency (Schmitt trigger), Vpp/Vrms, FFT peaks (quadratic interpolation) |
-| **Decimation** | 3 modes: Normal (midpoint), Average (mean), Peak Detect (min/max alternating) |
-| **Display** | SSD1306 128×64 OLED (I2C @ 400 kHz), 12 FPS update rate |
-| **Generator** | TIM3 PWM: 1 Hz–100 kHz, 1–99% duty cycle, dynamic prescaler |
-
-### ESP32 & Web Interface
-| Category | Implementation |
-|----------|----------------|
-| **Network** | WiFi AP (192.168.4.1), AsyncWebSocket, supports up to 8 concurrent clients |
-| **Data Path** | STM32 SPI (DMA, non-blocking) → Binary WebSocket → HTML5 Canvas @ 20 FPS nominal |
-| **Adaptive Streaming** | 3-tier throttling (20/7/1 FPS) based on per-client + system-wide error counters |
-| **Recovery** | Browser freeze detection (5s threshold), soft recovery (2 attempts) before reload |
-| **Control** | UART 115200 baud (commands/measurements), real-time sliders with 150ms throttling |
-
----
-
-**Key Design Decisions:** Dual-MCU isolates real-time DSP from WiFi jitter | DMA for zero-CPU overhead | Adaptive rate control prevents client overload | EMA filtering (α=0.3) for spectral stability
----
-
-
 
 ## Analog Front End
 
-**Constraints:** Single 3.3V supply | Survives ±26V input | 500 kHz bandwidth (flat across all gains)
-
-### Signal Chain
+**Constraints:** Single 3.3V supply | Survives ±26V | 500 kHz bandwidth
 
 ```mermaid
 flowchart LR
-    subgraph INPUT["INPUT"]
-        BNC(["±26V"])
-    end
-
-    subgraph ATTEN["ATTENUATE"]
-        DIV["Compensated<br>Divider"]
-        RELAY["4 Relay-<br>Switched<br>Ratios"]
-    end
-
-    subgraph CONDITION["CONDITION"]
-        SHIFT["Level Shift<br>0V → 1.65V"]
-        PGA["PGA<br>×1 to ×12"]
-    end
-
-    subgraph PROTECT["PROTECT"]
-        CLAMP["Clamp +<br>Filter"]
-    end
-
-    subgraph MCU["STM32"]
-        ADC["ADC"]
-        AUTO["Auto-Range"]
-    end
-
-    BNC --> DIV
-    RELAY -.-> DIV
-    DIV --> SHIFT --> PGA --> CLAMP --> ADC --> AUTO
-    AUTO -.->|"adjust"| RELAY
-    AUTO -.->|"adjust"| PGA
+    BNC["±26V"] --> ATTEN["Relay-Switched<br>Attenuator<br>÷1 to ÷16"]
+    ATTEN --> SHIFT["Inverting<br>Level Shift<br>0V → 1.65V"]
+    SHIFT --> PGA["Mux-Switched<br>PGA<br>×1 to ×12"]
+    PGA --> PROT["Schottky Clamp<br>+ RC Filter"]
+    PROT --> ADC["STM32 ADC"]
 
     style ATTEN fill:#fff3cd,stroke:#ffc107
-    style CONDITION fill:#d3f9d8,stroke:#40c057
-    style PROTECT fill:#ffe8cc,stroke:#fd7e14
-    style MCU fill:#e7f5ff,stroke:#339af0
+    style PGA fill:#d3f9d8,stroke:#40c057
+    style PROT fill:#ffe8cc,stroke:#fd7e14
 ```
 
-**How it works:**
-1. **Attenuator** — Relay-switched compensated divider (÷1 to ÷16) handles high voltage
-2. **Level shift** — Inverting stage (×−1) translates bipolar signal to 1.65V center
-3. **PGA** — Mux-selected feedback sets gain (×1–×12) with bandwidth-matched caps
-4. **Protection** — Schottky clamps + RC filter; hardware pull-downs ensure safe boot
+| Stage | Implementation |
+|-------|----------------|
+| Attenuator | 4 relay-switched compensated dividers (flat frequency response) |
+| Level Shift | Inverting stage, translates bipolar to 1.65V center |
+| PGA | 8 mux-switched gains with bandwidth-matched caps (~500 kHz all settings) |
+| Protection | Schottky clamps, RC filter, hardware pull-downs for safe boot |
 
-MCU monitors ADC codes and steps through 32 combinations (4 divider × 8 PGA) automatically.
+### Auto-Ranging Strategy
 
-### Schematic
+STM32 monitors ADC codes and adjusts gain to **maximize SNR without clipping:**
+
+| Signal Level | Path | Rationale |
+|--------------|------|-----------|
+| Large (>1.65V) | Attenuator ÷2–÷16, PGA ×1 | Attenuate only, avoid amplifier noise |
+| Medium (~1V) | Bypass ÷1, PGA ×1 | Direct path |
+| Small (<500mV) | Bypass ÷1, PGA ×2–×12 | Amplify to fill ADC range |
+
+Runs every 10 ms with hysteresis. Boot default: maximum attenuation.
+
+<details>
+<summary>Range Examples</summary>
+
+| Input Range | Attenuator | PGA | Total Gain |
+|:-----------:|:----------:|:---:|:----------:|
+| ±25.9 V | ÷15.7 | ×1 | 0.064 |
+| ±9.3 V | ÷5.65 | ×1 | 0.177 |
+| ±1.65 V | ÷1 | ×1 | 1 |
+| ±412 mV | ÷1 | ×4 | 4 |
+| ±137 mV | ÷1 | ×12 | 12 |
+
+PGA gain >×1 only when attenuator bypassed — minimizes noise contribution.
+
+</details>
+
+<details>
+<summary>Schematic</summary>
 
 <p align="center">
-  <img src="Hardware/afe_schematic.svg" alt="AFE Schematic" width="100%">
+  <img src="Hardware/afe_preview.png" alt="AFE Schematic" width="100%">
 </p>
 
----
-
-### Auto-Ranging
-
-| Condition | Action |
-|-----------|--------|
-| ADC near rails (>97% or <3%) | Reduce gain |
-| Signal too small (<25%) | Increase gain |
-| Optimal | Hold |
-
-Runs every 10 ms with hysteresis. Boot default: ÷16, ×1 (maximum attenuation).
-
-<details>
-<summary>Range Table</summary>
-
-**Attenuator (relay-switched):**
-
-| Relay | R_bot | Ratio | C_top |
-|:-----:|:-----:|:-----:|:-----:|
-| K0 | 6.81 kΩ | ÷15.7 | 2.2 pF |
-| K1 | 21.5 kΩ | ÷5.65 | 5.6 pF |
-| K2 | 75 kΩ | ÷2.33 | 15 pF |
-| K3 | Bypass | ÷1 | — |
-
-**PGA (mux-switched):**
-
-| Ch | R_f | Gain | C_f | BW |
-|:--:|:---:|:----:|:---:|:--:|
-| 0 | 10k | ×1 | 33p | 480 kHz |
-| 1 | 20k | ×2 | 15p | 530 kHz |
-| 2 | 30.1k | ×3 | 10p | 530 kHz |
-| 3 | 40.2k | ×4 | 8.2p | 480 kHz |
-| 4 | 49.9k | ×5 | 6.8p | 470 kHz |
-| 5 | 60.4k | ×6 | 5.6p | 470 kHz |
-| 6 | 80.6k | ×8 | 3.9p | 510 kHz |
-| 7 | 121k | ×12 | 2.7p | 490 kHz |
-
-**Example combinations:**
-
-| Atten | PGA | Total Gain | Input Range | Resolution |
-|:-----:|:---:|:----------:|:-----------:|:----------:|
-| ÷15.7 | ×1 | 0.064 | ±25.9 V | 12.7 mV/LSB |
-| ÷5.65 | ×2 | 0.35 | ±4.7 V | 2.3 mV/LSB |
-| ÷1 | ×12 | 12 | ±137 mV | 67 µV/LSB |
-
-</details>
-
-
-
-<details>
-<summary>Design Decisions</summary>
-
-| Choice | Rationale |
-|--------|-----------|
-| Relays for attenuator | Low R_on, no distortion, handles ±26V |
-| Compensated divider | Flat response despite capacitive loading |
-| Inverting topology | Constant BW and input impedance across gains |
-| Matched R_f × C_f | Same ~500 kHz bandwidth at all PGA settings |
-| Fixed 22pF C_bot | Absorbs strays into stable NP0 value |
+[Download PDF](Hardware/afe_schematic.pdf)
 
 </details>
 
 ---
 
-## Known Limitations
+## Implementation
 
-| Issue | Impact | Status |
-|-------|--------|--------|
-| No voltage calibration | ±5% accuracy | Future |
-| Software trigger only | May miss fast transients | Future |
+### STM32F411
+
+| Category | Implementation |
+|----------|----------------|
+| Peripherals | ADC+DMA, TIM2 (trigger), TIM3 (PWM), SPI+DMA, UART, I2C |
+| Architecture | Event-driven superloop with DMA completion flags |
+| Acquisition | Timer-triggered ADC, 10 Hz – 1 MSPS dynamic |
+| DSP | ARM CMSIS 4096-pt FFT, Hanning window, EMA filtering |
+| Measurements | Zero-crossing frequency, Vpp, Vrms, top 5 FFT peaks |
+| Decimation | Normal, Average, Peak Detect modes |
+| Generator | PWM 1 Hz – 100 kHz, 1–99% duty, dynamic prescaler |
+
+### ESP32
+
+| Category | Implementation |
+|----------|----------------|
+| Network | WiFi AP (192.168.4.1), AsyncWebSocket, 8 concurrent clients |
+| Streaming | SPI → Binary WebSocket → HTML5 Canvas @ 20 FPS |
+| Throttling | 3-tier adaptive (20/7/1 FPS) based on error rate |
+| Recovery | Per-client tracking, browser freeze detection (5s timeout) |
+
+### Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Web-based interface | Unlimited features via software, no hardware changes |
+| WiFi AP mode | Works anywhere, no router needed |
+| Dual-MCU | Real-time DSP isolated from WiFi stack jitter |
+| DMA everywhere | Zero CPU overhead for ADC and SPI |
+| Compensated dividers | Flat frequency response across attenuation |
+| Matched PGA bandwidth | Consistent 500 kHz at all gain settings |
+| Adaptive streaming | Graceful degradation, prevents client overload |
+
+---
+
+## Demo
+
+https://github.com/user/repo/raw/main/docs/demo.mp4
 
 ---
 
@@ -269,36 +247,39 @@ Runs every 10 ms with hysteresis. Boot default: ÷16, ×1 (maximum attenuation).
 </p>
 
 <details>
-<summary>Bill of Materials</summary>
+<summary>Bill of Materials ~$15</summary>
 
-| Ref | Component | Value | Purpose |
-|-----|-----------|-------|---------|
-| U1 | STM32F411CEU6 | — | Main MCU |
-| U2 | ESP32-WROOM-32 | — | WiFi bridge |
-| U3, U4 | Rail-to-rail op-amp | — | Level shift + PGA |
-| U5 | CD74HC4051 | — | PGA gain mux |
-| U6 | CD74HC238 | — | Relay decoder |
-| U7 | ULN2003A | — | Relay driver |
-| U8 | AP2112K-3.3 | — | LDO |
-| U9 | SSD1306 | 128×64 | OLED |
-| K0–K3 | DPDT relay | 5V coil | Attenuator |
-| D1, D2 | BAT54S | — | Schottky clamps |
-| — | Resistors | 6.81k–121k | Divider + PGA |
-| — | Capacitors | 2.2p–33p NP0 | Compensation |
-
-**Estimated BOM: ~$15**
+| Component | Purpose |
+|-----------|---------|
+| STM32F411 | Main MCU: acquisition, DSP, AFE control |
+| ESP32 | WiFi AP, WebSocket, web UI hosting |
+| Rail-to-rail op-amps | Level shift + PGA stages |
+| CD74HC4051 | PGA gain mux (8 channels) |
+| CD74HC238 + ULN2003A | Relay decoder + driver |
+| DPDT relays (×4) | Attenuator switching |
+| SSD1306 OLED | Local display |
+| BAT54S | Schottky input protection |
 
 </details>
 
 ---
 
+## Known Limitations
+
+| Issue | Status |
+|-------|--------|
+| No voltage calibration (±5% accuracy) | Future |
+| Software trigger only | Future |
+
+---
+
 ## License
 
-MIT License — See [LICENSE](LICENSE)
+MIT — See [LICENSE](LICENSE)
 
 ---
 
 <p align="center">
-  <b>Built by Mohammad Reza Safaeian</b><br><br>
-  <a href="mailto:your@email.com">Email</a>
+  <b>Built by Mohammad Reza Safaeian</b><br>
+  <a href="mailto:mohammad.rsafaeian@gmail.com">Email</a>
 </p>

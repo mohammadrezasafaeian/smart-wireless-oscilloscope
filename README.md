@@ -54,7 +54,7 @@ flowchart LR
 
 The hardware is the platform. The web interface is where intelligence lives.
 
-**Current features:** Auto-ranging with SNR optimization, FFT peak detection, auto-measurements, adaptive streaming, multi-client viewing (8 simultaneous)
+**Current features:** Auto-ranging with SNR optimization, FFT peak detection, auto-measurements, adaptive streaming, multi-client viewing
 
 **Future additions (no hardware changes):** Protocol decoding, cloud logging, automated testing, remote lab access, AI-assisted anomaly detection
 
@@ -66,11 +66,11 @@ The hardware is the platform. The web interface is where intelligence lives.
 |-----------|-------|
 | Sample Rate | 1 MSPS |
 | Resolution | 12-bit |
-| Bandwidth | DC — 500 kHz (flat across all gains) |
-| Input Range | ±137 mV to ±26 V (auto-selected) |
-| FFT | 4096-point, top 5 peaks detected |
-| Generator | PWM 1 Hz – 100 kHz, 1–99% duty |
-| Display | Browser + 128×64 OLED |
+| Bandwidth | DC — 500 kHz |
+| Input Range | ±137 mV to ±26 V (auto) |
+| FFT | 4096-point, top 5 peaks |
+| Generator | PWM 1 Hz – 100 kHz |
+| Display | Browser + OLED |
 
 ---
 
@@ -79,16 +79,12 @@ The hardware is the platform. The web interface is where intelligence lives.
 ```mermaid
 flowchart TB
     subgraph ANALOG["ANALOG FRONT END"]
-        PROBE["BNC ±26V"] --> ATTEN["Attenuator"]
-        ATTEN --> SHIFT["Level Shift"]
-        SHIFT --> PGA["PGA"]
-        PGA --> PROT["Protection"]
+        PROBE["BNC ±26V"] --> AFE["Auto-Range AFE<br>32 gain settings<br>Safe boot: max atten"]
     end
 
     subgraph STM32["STM32F4 @ 100 MHz"]
         ADC["ADC 1 MSPS"] --> DSP["FFT + Measure"]
         DSP --> OLED["OLED"]
-        DSP --> RANGE["Auto-Range"]
     end
 
     subgraph ESP32["ESP32 @ 240 MHz"]
@@ -99,11 +95,10 @@ flowchart TB
         UI["Any Device"]
     end
 
-    PROT --> ADC
-    RANGE -.->|"Relay Control"| ATTEN
-    RANGE -.->|"Mux Control<br>Safe boot: max atten"| PGA
-    DSP ==>|"Waveform<br>SPI + DMA"| WS
-    DSP <-->|"Measurements<br>UART"| WS
+    AFE --> ADC
+    DSP -.->|"Gain Control"| AFE
+    DSP ==>|"SPI + DMA"| WS
+    DSP <-->|"UART"| WS
     WS <-->|"WiFi AP"| UI
 
     style ANALOG fill:#fff3cd,stroke:#ffc107
@@ -112,19 +107,49 @@ flowchart TB
     style CLIENT fill:#d3f9d8,stroke:#40c057
 ```
 
-### Auto-Ranging Strategy
+| Component | Role |
+|-----------|------|
+| STM32F411 | Sampling, DSP, measurements, AFE control |
+| ESP32 | WiFi AP, WebSocket streaming, web UI |
+| Dual-MCU | Isolates real-time DSP from WiFi jitter |
 
-STM32 monitors ADC codes and adjusts gain to **maximize SNR without clipping:**
+---
 
-| Signal Level | Path | Rationale |
-|--------------|------|-----------|
-| Large (>1.65V) | Attenuator ÷2–÷16, PGA ×1 | Attenuate only, avoid amplifier noise |
-| Medium (~1V) | Bypass ÷1, PGA ×1 | Direct path |
-| Small (<500mV) | Bypass ÷1, PGA ×2–×12 | Amplify to fill ADC range |
+## Analog Front End
 
-Runs every 10 ms with hysteresis.
+**Constraints:** Single 3.3V supply | Survives ±26V | 500 kHz bandwidth
 
-**Safe boot:** Hardware pull-downs force maximum attenuation (÷16, ×1) before MCU initializes — ADC protected even if ±26V applied at power-on.
+```mermaid
+flowchart LR
+    BNC["±26V"] --> ATTEN["Attenuator<br>÷1 to ÷16<br>Relay-switched"]
+    ATTEN --> SHIFT["Level Shift<br>0V → 1.65V"]
+    SHIFT --> PGA["PGA<br>×1 to ×12<br>Mux-switched"]
+    PGA --> PROT["Protection<br>Clamp + Filter"]
+    PROT --> ADC["ADC"]
+
+    style ATTEN fill:#fff3cd,stroke:#ffc107
+    style PGA fill:#d3f9d8,stroke:#40c057
+    style PROT fill:#ffe8cc,stroke:#fd7e14
+```
+
+| Stage | Function |
+|-------|----------|
+| Attenuator | 4 relay-switched compensated dividers |
+| Level Shift | Translates bipolar to 1.65V center |
+| PGA | 8 mux-switched gains, bandwidth-matched |
+| Protection | Schottky clamps, RC filter |
+
+### Auto-Ranging
+
+STM32 adjusts gain to **maximize SNR without clipping:**
+
+| Signal | Strategy |
+|--------|----------|
+| Large (>1.65V) | Attenuate only, PGA ×1 |
+| Medium | Direct path |
+| Small (<500mV) | Amplify with PGA |
+
+**Safe boot:** Hardware pull-downs force maximum attenuation before MCU initializes — ADC protected even if ±26V applied at power-on.
 
 <details>
 <summary>Range Examples</summary>
@@ -136,8 +161,6 @@ Runs every 10 ms with hysteresis.
 | ±1.65 V | ÷1 | ×1 | 1 |
 | ±412 mV | ÷1 | ×4 | 4 |
 | ±137 mV | ÷1 | ×12 | 12 |
-
-PGA gain >×1 only when attenuator bypassed — minimizes noise.
 
 </details>
 
@@ -160,11 +183,9 @@ PGA gain >×1 only when attenuator bypassed — minimizes noise.
 
 | Category | Implementation |
 |----------|----------------|
-| Peripherals | ADC+DMA, TIM2 (trigger), TIM3 (PWM), SPI+DMA, UART, I2C |
-| Architecture | Event-driven superloop with DMA completion flags |
-| Acquisition | Timer-triggered ADC, 10 Hz – 1 MSPS dynamic |
-| DSP | ARM CMSIS 4096-pt FFT, Hanning window, EMA filtering |
-| Measurements | Zero-crossing frequency, Vpp, Vrms, top 5 FFT peaks |
+| Acquisition | Timer-triggered ADC + DMA, 10 Hz – 1 MSPS |
+| DSP | ARM CMSIS 4096-pt FFT, Hanning window |
+| Measurements | Frequency, Vpp, Vrms, top 5 FFT peaks |
 | Decimation | Normal, Average, Peak Detect modes |
 | Generator | PWM 1 Hz – 100 kHz, 1–99% duty |
 
@@ -172,22 +193,19 @@ PGA gain >×1 only when attenuator bypassed — minimizes noise.
 
 | Category | Implementation |
 |----------|----------------|
-| Network | WiFi AP (192.168.4.1), AsyncWebSocket, 8 clients |
-| Streaming | SPI → Binary WebSocket → Canvas @ 20 FPS |
-| Throttling | Adaptive 20/7/1 FPS based on client load |
-| Recovery | Browser freeze detection, auto-reconnect |
+| Network | WiFi AP (192.168.4.1), WebSocket, 8 clients |
+| Streaming | Binary WebSocket → Canvas @ 20 FPS |
+| Resilience | Adaptive throttling, auto-reconnect |
 
 ### Design Decisions
 
 | Decision | Rationale |
 |----------|-----------|
-| Web-based interface | Unlimited features via software updates |
-| WiFi AP mode | Works anywhere, no router needed |
-| Dual-MCU | Real-time DSP isolated from WiFi jitter |
-| DMA everywhere | Zero CPU overhead for ADC and SPI |
+| Web-based | Unlimited features, no install |
+| WiFi AP | Works anywhere, no router |
+| Dual-MCU | DSP isolated from WiFi jitter |
+| DMA | Zero CPU overhead |
 | Hardware safe boot | ADC protected before firmware runs |
-| Compensated dividers | Flat frequency response across gains |
-| Adaptive streaming | Graceful degradation under load |
 
 ---
 
@@ -208,11 +226,10 @@ https://github.com/user/repo/raw/main/docs/demo.mp4
 
 | Component | Purpose |
 |-----------|---------|
-| STM32F411 | MCU: acquisition, DSP, AFE control |
-| ESP32 | WiFi AP, WebSocket, web hosting |
-| Rail-to-rail op-amps | Level shift + PGA |
-| CD74HC4051 | PGA gain mux |
-| CD74HC238 + ULN2003A | Relay decoder + driver |
+| STM32F411 | MCU: acquisition, DSP, control |
+| ESP32 | WiFi, WebSocket, web UI |
+| Op-amps + CD74HC4051 | AFE signal conditioning |
+| CD74HC238 + ULN2003A | Relay control |
 | DPDT relays (×4) | Attenuator |
 | SSD1306 OLED | Local display |
 | BAT54S | Input protection |
@@ -225,7 +242,7 @@ https://github.com/user/repo/raw/main/docs/demo.mp4
 
 | Issue | Status |
 |-------|--------|
-| No voltage calibration (±5% accuracy) | Future |
+| No voltage calibration (±5%) | Future |
 | Software trigger only | Future |
 
 ---

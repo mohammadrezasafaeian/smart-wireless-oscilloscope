@@ -102,8 +102,35 @@ flowchart LR
 - **Analysis**: Real-time 4096-point FFT, auto-measurements (Freq, Vpp, Vrms, Duty)
 - **Generator**: PWM output 1 Hz — 100 kHz, variable duty cycle
 - **Local Display**: 128×64 OLED for standalone operation
+## Implementation Details
+
+### STM32F411 (Signal Acquisition & DSP)
+| Category | Implementation |
+|----------|----------------|
+| **Peripherals** | ADC1+DMA (1 MSPS max), TIM2 (ADC trigger), TIM3 (PWM gen), SPI2+DMA (ESP32), UART2 (commands), I2C1 (OLED) |
+| **Architecture** | Event-driven superloop with flags (`adc_ready`, `spi_busy`, `cmd_ready`) |
+| **Sample Rate** | Dynamic TIM2 reconfiguration: 10 Hz–1 MSPS based on timebase |
+| **Signal Processing** | ARM CMSIS DSP: 4096-pt FFT, Hanning window, EMA filtering (α=0.2) |
+| **Measurements** | Zero-crossing frequency (Schmitt trigger), Vpp/Vrms, FFT peaks (quadratic interpolation) |
+| **Decimation** | 3 modes: Normal (midpoint), Average (mean), Peak Detect (min/max alternating) |
+| **Display** | SSD1306 128×64 OLED (I2C @ 400 kHz), 12 FPS update rate |
+| **Generator** | TIM3 PWM: 1 Hz–100 kHz, 1–99% duty cycle, dynamic prescaler |
+
+### ESP32 & Web Interface
+| Category | Implementation |
+|----------|----------------|
+| **Network** | WiFi AP (192.168.4.1), AsyncWebSocket, supports up to 8 concurrent clients |
+| **Data Path** | STM32 SPI (DMA, non-blocking) → Binary WebSocket → HTML5 Canvas @ 20 FPS nominal |
+| **Adaptive Streaming** | 3-tier throttling (20/7/1 FPS) based on per-client + system-wide error counters |
+| **Recovery** | Browser freeze detection (5s threshold), soft recovery (2 attempts) before reload |
+| **Control** | UART 115200 baud (commands/measurements), real-time sliders with 150ms throttling |
 
 ---
+
+**Key Design Decisions:** Dual-MCU isolates real-time DSP from WiFi jitter | DMA for zero-CPU overhead | Adaptive rate control prevents client overload | EMA filtering (α=0.3) for spectral stability
+---
+
+
 
 ## Analog Front End
 

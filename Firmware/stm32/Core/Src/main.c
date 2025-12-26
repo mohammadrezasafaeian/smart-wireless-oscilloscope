@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "osc_config.h"
+#include "osc_signal.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -58,8 +59,7 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
-// Capture, display and command buffers
-uint16_t adc_buffer[ADC_BUFFER_SIZE] __attribute__((aligned(4)));
+// Display and command buffers
 uint16_t display_buffer[DISPLAY_SAMPLES];
 char cmd_buffer[CMD_BUFFER_SIZE];
 
@@ -73,6 +73,7 @@ uint8_t uart_rx_byte = 0;
 
 // Configuration
 OscSettings settings = DEFAULT_SETTINGS;
+Measurements measurements = {0};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -167,6 +168,7 @@ static void process_command(char *cmd) {
     switch(cmd[0]) {
         case 'T':  // Timebase: T:100
             settings.time_div_us = val;
+            reset_measurement_filter();
             apply_settings(&settings);
             break;
 
@@ -244,10 +246,11 @@ int main(void)
       if(adc_ready && !spi_busy) {
           adc_ready = 0;
 
-          // Straight copy of the head of the buffer; there is no decimator
-          // and nothing to measure with yet.
           for(uint16_t i = 0; i < DISPLAY_SAMPLES; i++)
               display_buffer[i] = adc_buffer[i];
+
+          measure_time_domain(adc_buffer, actual_samples_captured,
+                              settings.sample_rate_hz, &measurements);
 
           // Send to ESP32 via SPI
           spi_busy = 1;

@@ -20,6 +20,53 @@ void reset_measurement_filter(void) {
     memset(&meas_filter, 0, sizeof(meas_filter));
 }
 
+/* ==================== DECIMATION ==================== */
+void decimate_samples(uint16_t *src, uint16_t src_size,
+                      uint16_t *dst, uint16_t dst_size, ScopeMode mode) {
+    if(!src_size || !dst_size) return;
+
+    // Source smaller than dest: pad with last sample
+    if(src_size <= dst_size) {
+        for(uint16_t i = 0; i < dst_size; i++)
+            dst[i] = src[(i < src_size) ? i : src_size - 1];
+        return;
+    }
+
+    for(uint16_t i = 0; i < dst_size; i++) {
+        // Map destination indices to source range
+        uint32_t start = ((uint32_t)i * (src_size - 1)) / (dst_size - 1);
+        uint32_t end = (i == dst_size - 1) ? src_size - 1 :
+                       ((uint32_t)(i + 1) * (src_size - 1)) / (dst_size - 1);
+
+        // Clamp bounds
+        if(start >= src_size) start = src_size - 1;
+        if(end >= src_size) end = src_size - 1;
+
+        uint16_t block_size = end - start + 1;
+        uint16_t *block = &src[start];
+
+        switch(mode) {
+            case MODE_AVERAGE: {
+                uint32_t sum = 0;
+                for(uint16_t j = 0; j < block_size; j++) sum += block[j];
+                dst[i] = sum / block_size;
+                break;
+            }
+            case MODE_PEAK_DETECT: {
+                uint16_t vmin = 4095, vmax = 0;
+                for(uint16_t j = 0; j < block_size; j++) {
+                    if(block[j] < vmin) vmin = block[j];
+                    if(block[j] > vmax) vmax = block[j];
+                }
+                dst[i] = (i & 1) ? vmax : vmin;  // Alternate min/max
+                break;
+            }
+            default:  // MODE_NORMAL
+                dst[i] = block[block_size / 2];
+        }
+    }
+}
+
 /* ==================== TIME DOMAIN MEASUREMENTS ==================== */
 void measure_time_domain(uint16_t *buffer, uint32_t size,
                          uint32_t sample_rate, Measurements *m) {

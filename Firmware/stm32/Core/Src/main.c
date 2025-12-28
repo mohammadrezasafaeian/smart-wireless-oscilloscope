@@ -182,6 +182,11 @@ static void process_command(char *cmd) {
             apply_settings(&settings);
             break;
 
+        case 'M':  // Mode: M:0/1/2
+            if(val <= 2) settings.mode = (ScopeMode)val;
+            reset_measurement_filter();
+            break;
+
         case 'R':  // Reset
             if(strcmp(cmd, "RESET") == 0) {
                 settings = (OscSettings)DEFAULT_SETTINGS;
@@ -246,8 +251,8 @@ int main(void)
       if(adc_ready && !spi_busy) {
           adc_ready = 0;
 
-          for(uint16_t i = 0; i < DISPLAY_SAMPLES; i++)
-              display_buffer[i] = adc_buffer[i];
+          decimate_samples(adc_buffer, actual_samples_captured,
+                           display_buffer, DISPLAY_SAMPLES, settings.mode);
 
           measure_time_domain(adc_buffer, actual_samples_captured,
                               settings.sample_rate_hz, &measurements);

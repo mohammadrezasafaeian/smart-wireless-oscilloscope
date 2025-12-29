@@ -83,13 +83,7 @@ FFT spectrum with peak detection using the internal signal generator:
 
 Full system test measuring audio signal from a phone:
 
-<p align="center">
-  <a href="https://youtube.com/watch?v=YOUR_VIDEO_ID">
-    <img src="docs/video-thumbnail.jpg" alt="Watch external signal demo" width="650">
-  </a>
-  <br>
-  <b>▶ Watch full demo</b>
-</p>
+https://github.com/user-attachments/assets/YOUR_VIDEO_ID_HERE
 
 ---
 

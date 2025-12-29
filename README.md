@@ -6,10 +6,12 @@
 ![Status](https://img.shields.io/badge/status-working_prototype-green)
 ![MCU](https://img.shields.io/badge/MCU-STM32F4%20%2B%20ESP32-blue)
 ![Sample Rate](https://img.shields.io/badge/sample_rate-1%20MSPS-orange)
+![FFT](https://img.shields.io/badge/FFT-4096--point-purple)
+![Generator](https://img.shields.io/badge/Signal_Gen-1Hz--100kHz-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 <p align="center">
-  <img src="docs/demo-frequency-domain.gif" alt="Time Domain Demo" width="700">
+  <img src="docs/demo-frequency-domain.gif" alt="Frequency Domain Demo" width="700">
 </p>
 
 ---
@@ -37,6 +39,33 @@ Power on → Connect to WiFi → Open browser → Measure.
 
 ---
 
+## Key Features
+
+<table>
+<tr>
+<td align="center" width="33%">
+<h3>📊 Spectrum Analyzer</h3>
+4096-point FFT with Hanning window<br>
+Top 5 peak detection<br>
+Real-time frequency analysis
+</td>
+<td align="center" width="33%">
+<h3>📶 Signal Generator</h3>
+Built-in PWM output<br>
+1 Hz – 100 kHz range<br>
+1–99% duty cycle control
+</td>
+<td align="center" width="33%">
+<h3>🔧 Auto-Ranging</h3>
+32 gain settings<br>
+±137 mV to ±26 V input<br>
+SNR optimization
+</td>
+</tr>
+</table>
+
+---
+
 ## Why Web-Based Matters
 
 ```mermaid
@@ -55,7 +84,7 @@ flowchart LR
 
 The hardware is the platform. The web interface is where intelligence lives.
 
-**Current features:** Auto-ranging with SNR optimization, FFT peak detection, auto-measurements, adaptive streaming, multi-client viewing, internal signal generator for self-test
+**Current features:** Auto-ranging with SNR optimization, FFT spectrum analysis with peak detection, auto-measurements, adaptive streaming, multi-client viewing, internal signal generator for self-test
 
 **Future additions (no hardware changes):** Protocol decoding, cloud logging, automated testing, remote lab access, AI-assisted anomaly detection
 
@@ -84,12 +113,12 @@ FFT spectrum with peak detection using the internal signal generator:
 Measuring audio signal from a phone:
 
 <p align="center">
-  <a href="https://github.com/mohammadrezasafaeian/smart-wireless-oscilloscope/blob/main/docs/demo-video.mp4">
+  <a href="https://github.com/mohammadrezasafaeian/smart-wireless-oscilloscope/raw/main/docs/demo-video.mp4">
     <img src="docs/video-thumbnail.png" alt="Watch demo with audio" width="650">
   </a>
   <br>
   <em>🔊 Click to watch with audio</em>
-</p>
+</p>>
 
 ---
 
@@ -285,4 +314,3 @@ MIT — See [LICENSE](LICENSE)
   <b>Built by Mohammad Reza Safaeian</b><br>
   <a href="mailto:mohammad.rsafaeian@gmail.com">Email</a>
 </p>
-```

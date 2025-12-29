@@ -9,7 +9,7 @@
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 <p align="center">
-  <img src="docs/demo-time-domain.gif" alt="Time Domain Demo" width="700">
+  <img src="docs/demo-frequency-domain.gif" alt="Time Domain Demo" width="700">
 </p>
 
 ---
@@ -81,9 +81,15 @@ FFT spectrum with peak detection using the internal signal generator:
 
 ### External Signal Test
 
-Full system test measuring audio signal from a phone:
+Measuring audio signal from a phone:
 
-https://github.com/user-attachments/assets/YOUR_VIDEO_ID_HERE
+<p align="center">
+  <a href="https://github.com/mohammadrezasafaeian/smart-wireless-oscilloscope/blob/main/docs/demo-video.mp4">
+    <img src="docs/video-thumbnail.jpg" alt="Watch demo with audio" width="650">
+  </a>
+  <br>
+  <em>🔊 Click to watch with audio</em>
+</p>
 
 ---
 

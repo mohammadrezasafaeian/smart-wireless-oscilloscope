@@ -1,3 +1,4 @@
+
 # Smart Wireless Oscilloscope
 
 > No software. No cables. Connect to WiFi, open browser, measure signals.
@@ -8,7 +9,7 @@
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 <p align="center">
-  <img src="docs/demo.gif" alt="Demo" width="700">
+  <img src="docs/demo-time-domain.gif" alt="Time Domain Demo" width="700">
 </p>
 
 ---
@@ -54,9 +55,41 @@ flowchart LR
 
 The hardware is the platform. The web interface is where intelligence lives.
 
-**Current features:** Auto-ranging with SNR optimization, FFT peak detection, auto-measurements, adaptive streaming, multi-client viewing
+**Current features:** Auto-ranging with SNR optimization, FFT peak detection, auto-measurements, adaptive streaming, multi-client viewing, internal signal generator for self-test
 
 **Future additions (no hardware changes):** Protocol decoding, cloud logging, automated testing, remote lab access, AI-assisted anomaly detection
+
+---
+
+## Demo
+
+### Time Domain Analysis
+
+Waveform capture and auto-measurements using the internal signal generator:
+
+<p align="center">
+  <img src="docs/demo-time-domain.gif" alt="Time Domain Demo" width="650">
+</p>
+
+### Frequency Domain Analysis
+
+FFT spectrum with peak detection using the internal signal generator:
+
+<p align="center">
+  <img src="docs/demo-frequency-domain.gif" alt="Frequency Domain Demo" width="650">
+</p>
+
+### External Signal Test
+
+Full system test measuring audio signal from a phone:
+
+<p align="center">
+  <a href="https://youtube.com/watch?v=YOUR_VIDEO_ID">
+    <img src="docs/video-thumbnail.jpg" alt="Watch external signal demo" width="650">
+  </a>
+  <br>
+  <b>▶ Watch full demo</b>
+</p>
 
 ---
 
@@ -206,12 +239,7 @@ STM32 adjusts gain to **maximize SNR without clipping:**
 | Dual-MCU | DSP isolated from WiFi jitter |
 | DMA | Zero CPU overhead |
 | Hardware safe boot | ADC protected before firmware runs |
-
----
-
-## Demo
-
-https://github.com/user/repo/raw/main/docs/demo.mp4
+| Internal generator | Self-test capability, no external equipment needed |
 
 ---
 
@@ -257,3 +285,4 @@ MIT — See [LICENSE](LICENSE)
   <b>Built by Mohammad Reza Safaeian</b><br>
   <a href="mailto:mohammad.rsafaeian@gmail.com">Email</a>
 </p>
+```

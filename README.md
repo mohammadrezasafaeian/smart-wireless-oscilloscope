@@ -85,7 +85,7 @@ Measuring audio signal from a phone:
 
 <p align="center">
   <a href="https://github.com/mohammadrezasafaeian/smart-wireless-oscilloscope/blob/main/docs/demo-video.mp4">
-    <img src="docs/video-thumbnail.jpg" alt="Watch demo with audio" width="650">
+    <img src="docs/video-thumbnail.png" alt="Watch demo with audio" width="650">
   </a>
   <br>
   <em>🔊 Click to watch with audio</em>

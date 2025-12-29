@@ -43,23 +43,23 @@ Power on → Connect to WiFi → Open browser → Measure.
 
 <table>
 <tr>
-<td align="center" width="33%">
-<h3>📊 Spectrum Analyzer</h3>
-4096-point FFT with Hanning window<br>
-Top 5 peak detection<br>
-Real-time frequency analysis
+<td align="center" width="25%">
+<h3>Wireless First</h3>
+WiFi AP mode<br>
+No cables, no drivers<br>
+Works with any device
 </td>
-<td align="center" width="33%">
-<h3>📶 Signal Generator</h3>
+<td align="center" width="25%">
+<h3>Spectrum Analyzer</h3>
+4096-point FFT<br>
+Hanning window<br>
+Top 5 peak detection
+</td>
+<td align="center" width="25%">
+<h3>Signal Generator</h3>
 Built-in PWM output<br>
-1 Hz – 100 kHz range<br>
-1–99% duty cycle control
-</td>
-<td align="center" width="33%">
-<h3>🔧 Auto-Ranging</h3>
-32 gain settings<br>
-±137 mV to ±26 V input<br>
-SNR optimization
+1 Hz – 100 kHz<br>
+Self-test capability
 </td>
 </tr>
 </table>

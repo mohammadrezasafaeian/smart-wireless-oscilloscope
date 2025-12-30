@@ -205,8 +205,8 @@ flowchart LR
 ### Schematic
 
 <p align="center">
-  <a href="Hardware/afe_schematic.png">
-    <img src="Hardware/afe_schematic.png" alt="AFE Schematic" width="100%">
+  <a href="docs/afe_schematic.png">
+    <img src="docs/afe_schematic.png" alt="AFE Schematic" width="100%">
   </a>
   <br>
   <em>Click to view full resolution</em>

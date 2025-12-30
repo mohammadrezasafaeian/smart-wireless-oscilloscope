@@ -177,6 +177,7 @@ flowchart TB
 
 ---
 
+
 ## Analog Front End
 
 **Goals:** Single 3.3V supply | Survives ±26V | 500 kHz bandwidth
@@ -200,6 +201,16 @@ flowchart LR
 | Level Shift | Translates bipolar to 1.65V center |
 | PGA | 8 mux-switched gains, bandwidth-matched |
 | Protection | Schottky clamps, RC filter |
+
+### Schematic
+
+<p align="center">
+  <a href="Hardware/afe_schematic.png">
+    <img src="Hardware/afe_schematic.png" alt="AFE Schematic" width="100%">
+  </a>
+  <br>
+  <em>Click to view full resolution</em>
+</p>
 
 ### Auto-Ranging
 
@@ -226,16 +237,6 @@ STM32 adjusts gain to **maximize SNR without clipping:**
 
 </details>
 
-<details>
-<summary>Schematic</summary>
-
-<p align="center">
-  <img src="Hardware/afe_preview.png" alt="AFE Schematic" width="100%">
-</p>
-
-[Download PDF](Hardware/afe_schematic.pdf)
-
-</details>
 
 ---
 

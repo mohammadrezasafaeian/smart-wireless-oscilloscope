@@ -179,7 +179,7 @@ flowchart TB
 
 ## Analog Front End
 
-**Constraints:** Single 3.3V supply | Survives ±26V | 500 kHz bandwidth
+**Goals:** Single 3.3V supply | Survives ±26V | 500 kHz bandwidth
 
 ```mermaid
 flowchart LR

@@ -13,7 +13,7 @@
 /* ==================== CLOCK CONFIG ==================== */
 #define SYSTEM_CLOCK_HZ     100000000UL  // 100 MHz
 #define TIM3_CLOCK_HZ       100000000UL  // PWM generator clock
-#define SR_TIME_MODE_MAX    2000000UL    // 2 MSPS max
+#define SR_TIME_MODE_MAX    1000000UL    // 1 MSPS max
 #define SR_FFT_MODE         500000UL     // 500 kSPS for FFT
 
 /* ==================== MEASUREMENT THRESHOLDS ==================== */

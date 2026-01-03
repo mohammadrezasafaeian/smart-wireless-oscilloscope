@@ -109,8 +109,9 @@ static void apply_settings(OscSettings *s) {
     uint32_t target_rate, samples_needed;
 
     {
-        // Constant rate: always sample flat out and take whatever fits.
-        target_rate = SR_TIME_MODE_MAX;
+        target_rate = window_us ? (ADC_BUFFER_SIZE * 1000000ULL / window_us) : SR_TIME_MODE_MAX;
+        if(target_rate > SR_TIME_MODE_MAX) target_rate = SR_TIME_MODE_MAX;
+        if(target_rate < 10) target_rate = 10;
         samples_needed = (target_rate * window_us) / 1000000ULL;
         if(samples_needed > ADC_BUFFER_SIZE) samples_needed = ADC_BUFFER_SIZE;
         if(samples_needed < DISPLAY_SAMPLES) samples_needed = DISPLAY_SAMPLES;

@@ -4,6 +4,11 @@
 
 /* ==================== BUFFERS ==================== */
 uint16_t adc_buffer[ADC_BUFFER_SIZE] __attribute__((aligned(4)));
+float32_t fft_input[FFT_SIZE];
+float32_t fft_output[FFT_SIZE];
+float32_t fft_accumulator[FFT_SIZE/2];
+arm_rfft_fast_instance_f32 fft_instance;
+uint8_t fft_frame_count = 0;
 
 /* ==================== EMA FILTER STATE ==================== */
 static struct {
@@ -14,6 +19,11 @@ static struct {
 /* ==================== HELPER: EMA UPDATE ==================== */
 static inline void ema_update(float32_t *state, float32_t value, uint8_t init) {
     *state = init ? value : (*state + EMA_ALPHA * (value - *state));
+}
+
+/* ==================== INITIALIZATION ==================== */
+void init_fft(void) {
+    arm_rfft_fast_init_f32(&fft_instance, FFT_SIZE);
 }
 
 void reset_measurement_filter(void) {
@@ -187,4 +197,121 @@ void measure_time_domain(uint16_t *buffer, uint32_t size,
     if(m->duty_percent < 1) m->duty_percent = 1;
     if(m->duty_percent > 99) m->duty_percent = 99;
     m->valid = 1;
+}
+
+/* ==================== FREQUENCY DOMAIN (FFT) ==================== */
+void measure_freq_domain(uint16_t *src, uint32_t sample_rate,
+                         uint16_t *dst, uint16_t dst_size, Measurements *m) {
+    // Reset accumulator on first frame
+    if(fft_frame_count == 0)
+        memset(fft_accumulator, 0, sizeof(fft_accumulator));
+
+    // Remove DC and apply Hanning window
+    float32_t dc = 0;
+    for(uint16_t i = 0; i < FFT_SIZE; i++) dc += src[i];
+    dc /= FFT_SIZE;
+
+    for(uint16_t i = 0; i < FFT_SIZE; i++) {
+        float32_t window = 0.5f - 0.5f * arm_cos_f32(2.0f * PI * i / (FFT_SIZE - 1));
+        fft_input[i] = ((float32_t)src[i] - dc) * window;
+    }
+
+    // Execute FFT
+    arm_rfft_fast_f32(&fft_instance, fft_input, fft_output, 0);
+
+    // Magnitude with exponential averaging
+    float32_t hz_per_bin = (float32_t)sample_rate / FFT_SIZE;
+    float32_t max_mag = 0;
+    uint16_t max_idx = 0;
+    float32_t alpha = 0.3f;
+
+    for(uint16_t i = 0; i < FFT_SIZE/2; i++) {
+        float32_t real = fft_output[i*2], imag = fft_output[i*2+1];
+        float32_t mag;
+        arm_sqrt_f32(real*real + imag*imag, &mag);
+
+        fft_accumulator[i] = (fft_frame_count == 0) ? mag :
+                             fft_accumulator[i] * (1.0f - alpha) + mag * alpha;
+
+        if(i > 2 && fft_accumulator[i] > max_mag) {
+            max_mag = fft_accumulator[i];
+            max_idx = i;
+        }
+    }
+    fft_frame_count++;
+
+    // Peak detection with quadratic interpolation
+    typedef struct { float32_t idx, mag; } Peak;
+    Peak peaks[20];
+    uint8_t peak_count = 0;
+    float32_t threshold = max_mag * 0.10f;
+
+    for(uint16_t i = 3; i < (FFT_SIZE/2) - 3 && peak_count < 20; i++) {
+        if(fft_accumulator[i] > threshold &&
+           fft_accumulator[i] > fft_accumulator[i-1] &&
+           fft_accumulator[i] > fft_accumulator[i+1] &&
+           fft_accumulator[i] > fft_accumulator[i-2] &&
+           fft_accumulator[i] > fft_accumulator[i+2]) {
+            // Quadratic interpolation for sub-bin accuracy
+            float32_t y0 = fft_accumulator[i-1];
+            float32_t y1 = fft_accumulator[i];
+            float32_t y2 = fft_accumulator[i+1];
+            float32_t denom = y0 - 2*y1 + y2;
+            float32_t delta = (denom != 0) ? (0.5f * (y0 - y2) / denom) : 0;
+
+            peaks[peak_count].idx = (float32_t)i + delta;
+            peaks[peak_count].mag = y1;
+            peak_count++;
+            i += 3;  // Skip nearby bins
+        }
+    }
+
+    // Sort peaks by magnitude (descending)
+    for(uint8_t i = 0; i < peak_count; i++) {
+        for(uint8_t j = 0; j < peak_count - i - 1; j++) {
+            if(peaks[j].mag < peaks[j+1].mag) {
+                Peak tmp = peaks[j];
+                peaks[j] = peaks[j+1];
+                peaks[j+1] = tmp;
+            }
+        }
+    }
+
+    // Scale factor for display
+    float32_t scale = (max_mag > 1.0f) ? (3800.0f / max_mag) : 1.0f;
+
+    // Store top 5 peaks
+    m->num_peaks = (peak_count > 5) ? 5 : peak_count;
+    for(uint8_t i = 0; i < m->num_peaks; i++) {
+        m->peak_freqs[i] = (uint32_t)(peaks[i].idx * hz_per_bin);
+        m->peak_mags[i] = (uint16_t)(peaks[i].mag * scale);
+    }
+
+    // Basic measurements
+    m->frequency_hz = (uint32_t)(max_idx * hz_per_bin);
+    m->period_us = m->frequency_hz ? (1000000UL / m->frequency_hz) : 0;
+    m->amplitude_mv = (uint16_t)(max_mag * scale * 0.87f);
+
+    // RMS via Parseval's theorem
+    float32_t total_power = 0;
+    for(uint16_t i = 1; i < FFT_SIZE/2; i++)
+        total_power += fft_accumulator[i] * fft_accumulator[i];
+    float32_t rms;
+    arm_sqrt_f32(total_power * 2.0f / FFT_SIZE, &rms);
+    m->vrms_mv = (uint16_t)(rms * 3300.0f / 4095.0f / sqrtf(2.0f));
+    m->valid = (max_mag > 100.0f && m->num_peaks > 0);
+
+    // Downsample spectrum for display
+    if(dst) {
+        uint16_t bin_step = (FFT_SIZE / 2) / dst_size;
+        for(uint16_t i = 0; i < dst_size; i++) {
+            float32_t local_max = 0;
+            for(uint16_t j = 0; j < bin_step; j++) {
+                uint16_t idx = i * bin_step + j;
+                if(idx < FFT_SIZE/2 && fft_accumulator[idx] > local_max)
+                    local_max = fft_accumulator[idx];
+            }
+            dst[i] = (uint16_t)(local_max * scale);
+        }
+    }
 }

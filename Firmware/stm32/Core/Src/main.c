@@ -21,8 +21,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "ssd1306.h"
 #include "osc_config.h"
 #include "osc_signal.h"
+#include "osc_display.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -74,6 +76,7 @@ uint8_t uart_rx_byte = 0;
 // Configuration
 OscSettings settings = DEFAULT_SETTINGS;
 Measurements measurements = {0};
+uint8_t measurements_enabled = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -108,7 +111,10 @@ static void apply_settings(OscSettings *s) {
     uint64_t window_us = (uint64_t)s->time_div_us * 10;
     uint32_t target_rate, samples_needed;
 
-    {
+    if(s->display_mode == DISPLAY_FREQ) {
+        target_rate = SR_FFT_MODE;
+        samples_needed = FFT_SIZE;
+    } else {
         target_rate = window_us ? (ADC_BUFFER_SIZE * 1000000ULL / window_us) : SR_TIME_MODE_MAX;
         if(target_rate > SR_TIME_MODE_MAX) target_rate = SR_TIME_MODE_MAX;
         if(target_rate < 10) target_rate = 10;
@@ -174,11 +180,13 @@ static void process_command(char *cmd) {
 
         case 'F':  // Generator freq: F:1000
             settings.generator_freq_hz = val;
+            reset_measurement_filter();
             apply_settings(&settings);
             break;
 
         case 'D':  // Duty cycle: D:50
             settings.duty_cycle_percent = (val < 1) ? 1 : (val > 99) ? 99 : val;
+            reset_measurement_filter();
             apply_settings(&settings);
             break;
 
@@ -187,10 +195,26 @@ static void process_command(char *cmd) {
             reset_measurement_filter();
             break;
 
+        case 'X':  // Display mode: X:0/1
+            if(val <= 1) {
+                settings.display_mode = (DisplayMode)val;
+                reset_measurement_filter();
+                fft_frame_count = 0;
+                apply_settings(&settings);
+            }
+            break;
+
+        case 'E':  // Measurements: E:0/1
+            measurements_enabled = (cmd[2] == '1');
+            reset_measurement_filter();
+            break;
+
         case 'R':  // Reset
             if(strcmp(cmd, "RESET") == 0) {
                 settings = (OscSettings)DEFAULT_SETTINGS;
-                    apply_settings(&settings);
+                reset_measurement_filter();
+                fft_frame_count = 0;
+                apply_settings(&settings);
             }
             break;
     }
@@ -205,6 +229,8 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
   // FIX: Define variables here so they are visible in the loop
+  uint8_t meas_divider = 0;
+  uint16_t scratch_buf[DISPLAY_SAMPLES]; // Local buffer for background FFT
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -234,34 +260,106 @@ int main(void)
   MX_SPI2_Init();
 
   /* USER CODE BEGIN 2 */
+  ssd1306_init();
+  ssd1306_clear();
+  ssd1306_print(10, 10, "OSCILLOSCOPE");
+  ssd1306_print(20, 25, "INITIALIZING...");
+  ssd1306_update();
+  HAL_Delay(1000);
+
+  init_fft();
   apply_settings(&settings);
   HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
+
+  ssd1306_clear();
+  ssd1306_print(20, 25, "READY!");
+  ssd1306_update();
+  HAL_Delay(500);
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN WHILE */
+  static uint8_t meas_counter = 0;
+  static uint8_t oled_counter = 0;
+  static uint8_t frames_to_discard = 0;
 
   while(1) {
       // Process commands
       if(cmd_ready) {
           cmd_ready = 0;
           process_command(cmd_buffer);
+          meas_counter = 0;
+          frames_to_discard = 3;  // Discard stale frames
       }
 
       // Process ADC data
       if(adc_ready && !spi_busy) {
           adc_ready = 0;
 
-          decimate_samples(adc_buffer, actual_samples_captured,
-                           display_buffer, DISPLAY_SAMPLES, settings.mode);
+          if(frames_to_discard > 0) { frames_to_discard--; continue; }
 
-          measure_time_domain(adc_buffer, actual_samples_captured,
-                              settings.sample_rate_hz, &measurements);
+          // Measure and prepare display buffer
+          if(settings.display_mode == DISPLAY_FREQ) {
+              measure_freq_domain(adc_buffer, settings.sample_rate_hz,
+                                 display_buffer, DISPLAY_SAMPLES, &measurements);
+          } else {
+              decimate_samples(adc_buffer, actual_samples_captured,
+                              display_buffer, DISPLAY_SAMPLES, settings.mode);
+              measure_time_domain(adc_buffer, actual_samples_captured,
+                                 settings.sample_rate_hz, &measurements);
+          }
 
           // Send to ESP32 via SPI
           spi_busy = 1;
           HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
           HAL_SPI_Transmit_DMA(&hspi2, (uint8_t*)display_buffer,
                                DISPLAY_SAMPLES * sizeof(uint16_t));
+
+          // Send measurements via UART (every 6 frames)
+          if((measurements_enabled || settings.display_mode == DISPLAY_FREQ)
+             && ++meas_counter >= 6 && measurements.valid) {
+              meas_counter = 0;
+              char buf[160];
+              snprintf(buf, sizeof(buf),
+                  "M:%u,%lu,%u,%u,%u,%lu,%u,%lu,%u,%lu,%u,%lu,%u,%lu,%u\n",
+                  measurements.amplitude_mv, measurements.frequency_hz,
+                  measurements.period_us, measurements.vrms_mv, measurements.num_peaks,
+                  measurements.peak_freqs[0], measurements.peak_mags[0],
+                  measurements.peak_freqs[1], measurements.peak_mags[1],
+                  measurements.peak_freqs[2], measurements.peak_mags[2],
+                  measurements.peak_freqs[3], measurements.peak_mags[3],
+                  measurements.peak_freqs[4], measurements.peak_mags[4]);
+              HAL_UART_Transmit(&huart2, (uint8_t*)buf, strlen(buf), 20);
+          }
+
+          // Update OLED (~12fps)
+          if(++oled_counter >= 2) {
+              oled_counter = 0;
+              ssd1306_clear();
+
+              uint16_t oled_buf[OLED_SAMPLES];
+              if(settings.display_mode == DISPLAY_FREQ) {
+                  draw_freq_grid();
+                  decimate_samples(display_buffer, DISPLAY_SAMPLES,
+                                  oled_buf, OLED_SAMPLES, MODE_PEAK_DETECT);
+                  draw_spectrum(oled_buf, OLED_SAMPLES);
+              } else {
+                  draw_grid();
+                  decimate_samples(display_buffer, DISPLAY_SAMPLES,
+                                  oled_buf, OLED_SAMPLES, MODE_NORMAL);
+                  draw_waveform(oled_buf, OLED_SAMPLES);
+              }
+
+              // Status line
+              char status[32];
+              if(settings.display_mode == DISPLAY_FREQ)
+                  snprintf(status, 32, "FFT %luHz Pk:%lumV",
+                           measurements.frequency_hz, (uint32_t)measurements.amplitude_mv);
+              else
+                  snprintf(status, 32, "T:%uus F:%luHz",
+                           settings.time_div_us, measurements.frequency_hz);
+              ssd1306_print(0, 0, status);
+              ssd1306_update();
+          }
       }
 
       HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_buffer, actual_samples_captured);

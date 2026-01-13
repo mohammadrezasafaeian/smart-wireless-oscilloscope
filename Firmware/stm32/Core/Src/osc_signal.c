@@ -122,41 +122,37 @@ void measure_time_domain(uint16_t *buffer, uint32_t size,
         return;
     }
 
-    // Zero-crossing frequency detection with hysteresis
-    uint16_t hyst = (amplitude * ZC_HYSTERESIS_PERCENT) / 100;
-    if(hyst < 20) hyst = 20;
-    uint16_t thresh_high = dc + hyst, thresh_low = dc - hyst;
-
-    uint32_t rising_edges = 0, first_edge = 0, last_edge = 0;
-    uint8_t state = (buffer[0] > dc);
-
-    for(uint32_t i = 1; i < size; i++) {
+    for(uint32_t i = 1; i < size; i++)
         if(buffer[i] > dc) high_count++;
 
-        // Schmitt trigger edge detection
-        if(!state && buffer[i] > thresh_high) {
-            state = 1;
-            if(!rising_edges) first_edge = i;
-            last_edge = i;
-            rising_edges++;
-        } else if(state && buffer[i] < thresh_low) {
-            state = 0;
-        }
-    }
-
-    // Calculate frequency from edge timing
+    // Frequency from a single FFT: find the largest bin and call it the
+    // fundamental.  Immune to the multiple-counting a noisy edge causes.
     float32_t raw_freq = 0, raw_period = 0;
-    if(rising_edges >= 2) {
-        uint32_t total_samples = last_edge - first_edge;
-        uint32_t periods = rising_edges - 1;
-        if(total_samples > 0 && periods > 0) {
-            float32_t avg_period = (float32_t)total_samples / periods;
-            if(avg_period >= 2.0f) {
-                raw_freq = (float32_t)sample_rate / avg_period;
-                raw_period = 1000000.0f / raw_freq;
-                // Nyquist limit check
-                if(raw_freq > sample_rate / 2.0f) raw_freq = raw_period = 0;
+    {
+        uint32_t n = (size < FFT_SIZE) ? size : FFT_SIZE;
+
+        for(uint32_t i = 0; i < FFT_SIZE; i++) {
+            if(i < n) {
+                float32_t w = 0.5f - 0.5f * arm_cos_f32(2.0f * PI * i / (n - 1));
+                fft_input[i] = ((float32_t)buffer[i] - dc) * w;
+            } else {
+                fft_input[i] = 0.0f;
             }
+        }
+
+        arm_rfft_fast_f32(&fft_instance, fft_input, fft_output, 0);
+
+        float32_t best = 0;
+        uint16_t best_idx = 0;
+        for(uint16_t i = 3; i < FFT_SIZE / 2; i++) {
+            float32_t re = fft_output[i*2], im = fft_output[i*2+1];
+            float32_t mag = re*re + im*im;
+            if(mag > best) { best = mag; best_idx = i; }
+        }
+
+        if(best_idx) {
+            raw_freq = (float32_t)best_idx * sample_rate / FFT_SIZE;
+            raw_period = (raw_freq > 0) ? (1000000.0f / raw_freq) : 0;
         }
     }
 

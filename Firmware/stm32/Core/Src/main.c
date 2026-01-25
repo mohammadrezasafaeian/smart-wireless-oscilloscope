@@ -105,8 +105,7 @@ static void apply_settings(OscSettings *s) {
     HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
     adc_ready = spi_busy = 0;
     memset(adc_buffer, 0, sizeof(adc_buffer));
-    // Longer settle: does the input need time before the first capture?
-    HAL_Delay(20);
+    HAL_Delay(2);
 
     // Calculate sample rate based on mode
     uint64_t window_us = (uint64_t)s->time_div_us * 10;
@@ -289,7 +288,7 @@ int main(void)
           cmd_ready = 0;
           process_command(cmd_buffer);
           meas_counter = 0;
-          frames_to_discard = 10;  // Discard stale frames
+          frames_to_discard = 3;  // Discard stale frames
       }
 
       // Process ADC data

@@ -457,6 +457,12 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
+  /* 3 cycles is the shortest sampling time the part offers, which is what
+     makes 1 MSPS reachable.  It also means the sample-and-hold sees a high
+     source impedance for a very short window, so the input needs a low
+     impedance drive and a solid ground return.  A breadboard does not
+     provide either: the return current from a capacitive load lifts local
+     ground on every fast edge, and the ADC reads that as signal. */
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {

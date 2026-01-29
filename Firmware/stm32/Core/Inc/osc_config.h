@@ -21,6 +21,10 @@
 #define ZC_HYSTERESIS_PERCENT   10      // Zero-crossing hysteresis
 #define EMA_ALPHA               0.15f   // EMA filter coefficient
 
+/* ==================== AUTORANGE THRESHOLDS ==================== */
+#define AFE_TARGET_HIGH         3600    // Counts: back off, next step clips
+#define AFE_TARGET_LOW          1600    // Counts: good enough, stop stepping
+
 /* ==================== ENUMERATIONS ==================== */
 typedef enum {
     MODE_NORMAL = 0,        // Direct sampling

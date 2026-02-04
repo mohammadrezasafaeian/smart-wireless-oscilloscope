@@ -25,6 +25,7 @@
 #include "osc_config.h"
 #include "osc_signal.h"
 #include "osc_display.h"
+#include "osc_afe.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -75,6 +76,8 @@ uint8_t uart_rx_byte = 0;
 
 // Configuration
 OscSettings settings = DEFAULT_SETTINGS;
+uint8_t afe_range = 0, afe_gain_idx = 0;
+uint32_t afe_full_scale_mv = 3300;
 Measurements measurements = {0};
 uint8_t measurements_enabled = 0;
 /* USER CODE END PV */
@@ -209,6 +212,18 @@ static void process_command(char *cmd) {
             reset_measurement_filter();
             break;
 
+        case 'Z':  // Autorange: one-shot, on request only
+            afe_full_scale_mv = afe_autorange(&afe_range, &afe_gain_idx);
+            reset_measurement_filter();
+            apply_settings(&settings);
+            {
+                char buf[48];
+                snprintf(buf, sizeof(buf), "Z:%u,%u,%lu\n",
+                         afe_range, afe_gain_idx, afe_full_scale_mv);
+                HAL_UART_Transmit(&huart2, (uint8_t*)buf, strlen(buf), 20);
+            }
+            break;
+
         case 'R':  // Reset
             if(strcmp(cmd, "RESET") == 0) {
                 settings = (OscSettings)DEFAULT_SETTINGS;
@@ -268,6 +283,7 @@ int main(void)
   HAL_Delay(1000);
 
   init_fft();
+  afe_init();
   apply_settings(&settings);
   HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
 

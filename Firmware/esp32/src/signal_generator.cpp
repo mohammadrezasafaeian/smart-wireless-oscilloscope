@@ -32,6 +32,8 @@ static constexpr uint16_t DAC_MID = 128;
 // Built once at boot; amplitude is applied per sample so a volume change
 // never needs the tables rebuilt.
 static uint8_t lut_sine[LUT_SIZE];
+static uint8_t lut_triangle[LUT_SIZE];
+static uint8_t lut_sawtooth[LUT_SIZE];
 
 static volatile uint32_t phase_acc   = 0;
 static volatile uint32_t tuning_word = 0;
@@ -42,6 +44,11 @@ static void build_tables() {
     for (uint32_t i = 0; i < LUT_SIZE; i++) {
         float ph = (2.0f * (float)M_PI * i) / LUT_SIZE;
         lut_sine[i]     = (uint8_t)(127.5f + 127.0f * sinf(ph));
+        lut_sawtooth[i] = (uint8_t)((i * 255) / (LUT_SIZE - 1));
+        // Triangle: rise over the first half, fall over the second.
+        lut_triangle[i] = (i < LUT_SIZE / 2)
+                        ? (uint8_t)((i * 255) / (LUT_SIZE / 2 - 1))
+                        : (uint8_t)(((LUT_SIZE - 1 - i) * 255) / (LUT_SIZE / 2));
     }
 }
 
@@ -62,6 +69,18 @@ static inline uint8_t next_sample() {
     switch (genState.waveform) {
         case WAVE_SINE:
             raw = lut_sine[idx];
+            break;
+
+        case WAVE_TRIANGLE:
+            raw = lut_triangle[idx];
+            break;
+
+        case WAVE_SAWTOOTH:
+            raw = lut_sawtooth[idx];
+            break;
+
+        case WAVE_RAMPDOWN:
+            raw = 255 - lut_sawtooth[idx];
             break;
 
         case WAVE_DC:

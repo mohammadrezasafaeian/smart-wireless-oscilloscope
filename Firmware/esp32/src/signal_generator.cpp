@@ -71,6 +71,14 @@ static inline uint8_t next_sample() {
             raw = lut_sine[idx];
             break;
 
+        case WAVE_SQUARE: {
+            // Duty is a fraction of the phase accumulator, not the LUT, so
+            // resolution stays at 32 bits regardless of table size.
+            uint32_t threshold = (uint32_t)(((uint64_t)genState.duty << 32) / 100);
+            raw = (phase_acc < threshold) ? 255 : 0;
+            break;
+        }
+
         case WAVE_TRIANGLE:
             raw = lut_triangle[idx];
             break;

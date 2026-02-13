@@ -37,6 +37,7 @@ static uint8_t lut_sawtooth[LUT_SIZE];
 
 static volatile uint32_t phase_acc   = 0;
 static volatile uint32_t tuning_word = 0;
+static volatile uint32_t lfsr        = 0xACE1u;   // any non-zero seed
 
 
 // ==================== TABLE CONSTRUCTION ====================
@@ -90,6 +91,16 @@ static inline uint8_t next_sample() {
         case WAVE_RAMPDOWN:
             raw = 255 - lut_sawtooth[idx];
             break;
+
+        case WAVE_NOISE: {
+            // Galois LFSR, 32-bit maximal-length polynomial.  One shift per
+            // sample: cheap, and spectrally flat enough for filter testing.
+            uint32_t lsb = lfsr & 1u;
+            lfsr >>= 1;
+            if (lsb) lfsr ^= 0xD0000001u;
+            raw = (uint8_t)(lfsr & 0xFF);
+            break;
+        }
 
         case WAVE_DC:
         default:

@@ -13,6 +13,7 @@
 
 #include "signal_generator.h"
 #include "config.h"
+#include <driver/i2s.h>
 #include <math.h>
 
 GeneratorState genState;
@@ -39,6 +40,7 @@ static volatile uint32_t phase_acc   = 0;
 static volatile uint32_t tuning_word = 0;
 static volatile uint32_t lfsr        = 0xACE1u;   // any non-zero seed
 
+static TaskHandle_t gen_task_handle = nullptr;
 
 // ==================== TABLE CONSTRUCTION ====================
 static void build_tables() {
@@ -112,12 +114,48 @@ static inline uint8_t next_sample() {
     return raw;
 }
 
+// ==================== I2S OUTPUT TASK ====================
+// Pinned to core 1.  i2s_write blocks until the DMA ring has room, which
+// paces the loop without a delay() and keeps timing independent of WiFi.
+static void gen_task(void* arg) {
+    (void)arg;
+    static uint16_t buf[DMA_BUF_LEN];
+    size_t written;
+
+    for (;;) {
+        for (uint32_t i = 0; i < DMA_BUF_LEN; i++) {
+            // Internal DAC takes the top 8 bits of each 16-bit word.
+            buf[i] = ((uint16_t)next_sample()) << 8;
+        }
+        i2s_write(I2S_NUM_0, buf, sizeof(buf), &written, portMAX_DELAY);
+    }
+}
+
 // ==================== PUBLIC API ====================
 void gen_init() {
     build_tables();
     update_tuning_word();
 
-    Serial.println("DDS tables built");
+    i2s_config_t cfg = {};
+    cfg.mode                = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN);
+    cfg.sample_rate         = SAMPLE_RATE;
+    cfg.bits_per_sample     = I2S_BITS_PER_SAMPLE_16BIT;
+    cfg.channel_format      = I2S_CHANNEL_FMT_ONLY_RIGHT;
+    cfg.communication_format = I2S_COMM_FORMAT_STAND_MSB;
+    cfg.intr_alloc_flags    = 0;
+    cfg.dma_buf_count       = DMA_BUF_CNT;
+    cfg.dma_buf_len         = DMA_BUF_LEN;
+    cfg.use_apll            = false;
+
+    if (i2s_driver_install(I2S_NUM_0, &cfg, 0, NULL) != ESP_OK) {
+        Serial.println("x I2S driver install failed");
+        return;
+    }
+    i2s_set_dac_mode(I2S_DAC_CHANNEL_RIGHT_EN);   // GPIO25
+    i2s_zero_dma_buffer(I2S_NUM_0);
+
+    xTaskCreatePinnedToCore(gen_task, "dds", 2048, NULL, 5, &gen_task_handle, 1);
+    Serial.println("OK DDS generator initialized (I2S DAC, core 1)");
 }
 
 void gen_set_waveform(uint8_t w) {

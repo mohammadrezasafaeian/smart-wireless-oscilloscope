@@ -110,8 +110,15 @@ static inline uint8_t next_sample() {
             break;
     }
 
-    if (!genState.enabled) return DAC_MID;
-    return raw;
+    if (!genState.enabled) return DAC_MID;      // park at mid-rail, not 0
+
+    // Scale about mid-rail so amplitude changes do not shift the DC offset.
+    int32_t centred = (int32_t)raw - 128;
+    centred = (centred * genState.amplitude) / 100;
+    int32_t out = centred + 128;
+    if (out < 0)   out = 0;
+    if (out > 255) out = 255;
+    return (uint8_t)out;
 }
 
 // ==================== I2S OUTPUT TASK ====================

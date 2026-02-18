@@ -17,7 +17,12 @@ struct SharedState {
     uint8_t dutyCycle;
     bool running;
     uint32_t lastChangeTime;
-    
+
+    // Generator state, mirrored here so new clients receive it on connect
+    uint8_t waveform;       // Waveform enum, see signal_generator.h
+    uint8_t amplitude;      // 0-100 %
+    bool genEnabled;        // Output on/off
+
     void reset() {
         displayMode = MODE_TIME_DOMAIN;
         frequency = 1000;
@@ -25,6 +30,9 @@ struct SharedState {
         dutyCycle = 50;
         running = true;
         lastChangeTime = millis();
+        waveform = 0;       // sine
+        amplitude = 100;
+        genEnabled = false;
     }
 };
 

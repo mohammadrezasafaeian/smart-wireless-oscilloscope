@@ -5,6 +5,7 @@
 #include "config.h"
 #include "structures.h"
 #include "state.h"
+#include "signal_generator.h"
 
 const char* SSID = "SmartScope-Pro";
 const char* PASSWORD = "12345678";
@@ -251,6 +252,7 @@ void processCommand(const char* cmd, uint32_t senderId) {
         uint32_t val = atoi((cmd[1] == ':') ? cmd + 2 : cmd + 1);
         if (val > 0 && val != sharedState.frequency) {
             sharedState.frequency = val;
+            gen_set_frequency(val);
             stateChanged = true;
         }
     }
@@ -265,7 +267,36 @@ void processCommand(const char* cmd, uint32_t senderId) {
         uint8_t val = atoi((cmd[1] == ':') ? cmd + 2 : cmd + 1);
         if (val > 0 && val <= 100 && val != sharedState.dutyCycle) {
             sharedState.dutyCycle = val;
+            gen_set_duty(val);
             stateChanged = true;
+        }
+    }
+    // ---- generator commands (ESP32-local, not forwarded to the STM32) ----
+    else if (cmd[0] == 'W') {          // W:<0-6>  waveform select
+        uint8_t val = atoi((cmd[1] == ':') ? cmd + 2 : cmd + 1);
+        if (val < WAVE_COUNT && val != sharedState.waveform) {
+            sharedState.waveform = val;
+            gen_set_waveform(val);
+            stateChanged = true;
+            Serial.printf("-> Waveform: %s\n", gen_waveform_name(val));
+        }
+    }
+    else if (cmd[0] == 'A') {          // A:<0-100>  amplitude %
+        uint8_t val = atoi((cmd[1] == ':') ? cmd + 2 : cmd + 1);
+        if (val <= 100 && val != sharedState.amplitude) {
+            sharedState.amplitude = val;
+            gen_set_amplitude(val);
+            stateChanged = true;
+        }
+    }
+    else if (cmd[0] == 'G') {          // G:0 / G:1  output enable
+        uint8_t val = atoi((cmd[1] == ':') ? cmd + 2 : cmd + 1);
+        bool on = (val != 0);
+        if (on != sharedState.genEnabled) {
+            sharedState.genEnabled = on;
+            gen_set_enabled(on);
+            stateChanged = true;
+            Serial.printf("-> Generator: %s\n", on ? "ON" : "OFF");
         }
     }
     else if (cmd[0] == 'M' || cmd[0] == 'E') {
@@ -285,7 +316,10 @@ void processCommand(const char* cmd, uint32_t senderId) {
         stateChanged = true;
     }
     
-    // Forward to STM32
+    // Forward to STM32.  W/A/G are handled entirely on the ESP32, so
+    // sending them would only waste UART bandwidth and log noise.
+    if (cmd[0] == 'W' || cmd[0] == 'A' || cmd[0] == 'G') return;
+
     char stmCmd[32];
     if ((cmd[0] == 'X' || cmd[0] == 'F' || cmd[0] == 'T' || 
          cmd[0] == 'D' || cmd[0] == 'M' || cmd[0] == 'E') && cmd[1] != ':') {

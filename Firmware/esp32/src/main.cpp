@@ -105,12 +105,16 @@ uint32_t getClientInterval(int slot) {
 String buildStateJson() {
     char buffer[256];
     snprintf(buffer, sizeof(buffer),
-        "{\"type\":\"state\",\"displayMode\":%d,\"frequency\":%lu,\"timebase\":%lu,\"duty\":%u,\"running\":%s}",
+        "{\"type\":\"state\",\"displayMode\":%d,\"frequency\":%lu,\"timebase\":%lu,"
+        "\"duty\":%u,\"running\":%s,\"waveform\":%u,\"amplitude\":%u,\"genOn\":%s}",
         sharedState.displayMode,
         sharedState.frequency,
         sharedState.timebase,
         sharedState.dutyCycle,
-        sharedState.running ? "true" : "false"
+        sharedState.running ? "true" : "false",
+        sharedState.waveform,
+        sharedState.amplitude,
+        sharedState.genEnabled ? "true" : "false"
     );
     return String(buffer);
 }

@@ -549,6 +549,9 @@ void setup() {
     
     Serial.print("SPI... ");
     setup_spi_slave();
+
+    Serial.print("DDS... ");
+    gen_init();
     
     Serial.println("WiFi AP...");
     WiFi.mode(WIFI_AP);

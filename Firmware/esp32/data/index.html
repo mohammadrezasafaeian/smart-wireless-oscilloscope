@@ -1222,10 +1222,43 @@
           
           <div class="control-group">
             <div class="control-header">
-              <span class="control-label">Generator</span>
+              <span class="control-label">Waveform</span>
+            </div>
+            <select id="waveform">
+              <option value="0">Sine</option>
+              <option value="1">Square</option>
+              <option value="2">Triangle</option>
+              <option value="3">Sawtooth</option>
+              <option value="4">Ramp Down</option>
+              <option value="5">Noise</option>
+              <option value="6">DC</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <span class="control-label">Frequency</span>
               <span class="control-value" id="frequency-val">1.0 kHz</span>
             </div>
-            <input type="range" id="frequency" min="100" max="50000" value="1000" step="100">
+            <input type="range" id="frequency" min="1" max="100000" value="1000" step="1">
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <span class="control-label">Amplitude</span>
+              <span class="control-value" id="amplitude-val">100%</span>
+            </div>
+            <input type="range" id="amplitude" min="0" max="100" value="100" step="1">
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <span class="control-label">Output</span>
+            </div>
+            <div class="btn-group">
+              <button class="btn" id="btn-gen-on"><span>ON</span></button>
+              <button class="btn active" id="btn-gen-off"><span>OFF</span></button>
+            </div>
           </div>
           
           <div class="control-group">

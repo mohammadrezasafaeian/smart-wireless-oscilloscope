@@ -1732,6 +1732,20 @@
         el.frequency.value = s.frequency;
         el.frequencyVal.textContent = formatFreq(s.frequency);
       }
+      if (s.waveform !== undefined) {
+        state.genWaveform = s.waveform;
+        el.waveform.value = String(s.waveform);
+      }
+      if (s.amplitude !== undefined) {
+        state.genAmplitude = s.amplitude;
+        el.amplitude.value = s.amplitude;
+        el.amplitudeVal.textContent = s.amplitude + '%';
+      }
+      if (s.genOn !== undefined) {
+        state.genOn = s.genOn;
+        el.btnGenOn.classList.toggle('active', s.genOn);
+        el.btnGenOff.classList.toggle('active', !s.genOn);
+      }
       
       if (s.duty !== undefined && s.duty !== state.duty) {
         state.duty = s.duty;

@@ -422,6 +422,40 @@ ADC is protected even if ±26 V is applied at power-on.
 
 ---
 
+## Debugging Notes
+
+Three problems took most of the development time.  None of them were where
+they first appeared to be.
+
+**The ADC was asked for more than it can do.** The timebase sets the sample
+rate, and the ceiling was originally 2 MSPS.  ADCCLK is PCLK2/4 = 25 MHz and a
+12-bit conversion takes 15 cycles, so the real ceiling is 1.67 MSPS.  TIM2 was
+retriggering the ADC before it had finished converting, and fast sweeps showed
+a waveform that was neither the input nor a clean alias of it.  Halving the
+maximum to 1 MSPS fixed it, with 400 ns of margin per conversion.
+
+**Constant sampling costs memory, not CPU.** After the rate was made to track
+the timebase, the obvious simplification was to sample flat out and decimate
+for display.  That works until the window gets long: 5 ms/div is a 50 ms
+sweep, which at 1 MSPS is 50,000 samples against an 8192-sample buffer, so
+only 16% of the screen held real data and the trace's apparent frequency
+changed with the timebase.  Covering the full window would need 100 kB of the
+F411's 128 kB.  The rate tracks the timebase again, and the buffer is always
+full.
+
+**Measure the hardware before you rewrite the firmware.** Feeding the PWM
+output through a capacitor should give a triangle wave; the display showed a
+sawtooth with a step on every rising edge.  Two days went into the acquisition
+code, the decimator and the measurement filter before the step's alignment
+with the PWM edge suggested looking at the analog side instead.  Probing the
+capacitor's own ground pin against board ground showed it moving several
+hundred millivolts on each edge — the capacitor's inrush current across the
+breadboard's contact resistance.  The firmware had been correct the whole
+time.  A scope would have found this in about a minute, which is a large part
+of why this project exists.
+
+---
+
 ## Known Limitations
 
 | Issue | Status |

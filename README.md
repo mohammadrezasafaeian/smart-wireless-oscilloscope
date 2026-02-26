@@ -9,23 +9,8 @@
 ![MCU](https://img.shields.io/badge/MCU-STM32F411%20%2B%20ESP32-blue)
 ![Sample Rate](https://img.shields.io/badge/sample_rate-1%20MSPS-orange)
 ![FFT](https://img.shields.io/badge/FFT-4096--point-purple)
-![Generator](https://img.shields.io/badge/Signal_Gen-7%20waveforms%20DDS-brightgreen)
 ![Cost](https://img.shields.io/badge/unit_cost-1.13M%20Tomans-red)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
-
-<p align="center">
-  <img src="docs/demo-frequency-domain.gif" alt="FFT Spectrum Analysis Demo" width="700">
-</p>
-
-<p align="center">
-  <img src="docs/demo-time-domain.gif" alt="Time Domain Capture Demo" width="700">
-</p>
-
-<p align="center">
-  <img src="docs/generator_demo.gif" alt="DDS Signal Generator Demo" width="700">
-  <br>
-  <em>⭐ NEW — 7-waveform DDS generator with loopback capture</em>
-</p>
 
 ---
 
@@ -165,3 +150,298 @@ The hardware is the platform. The web interface is where intelligence lives — 
 
 ---
 
+## System Architecture
+
+```mermaid
+flowchart TB
+    subgraph ANALOG["ANALOG FRONT END"]
+        PROBE["BNC ±26V"] --> AFE["Auto-Range AFE<br>32 gain settings<br>Safe boot: max atten."]
+    end
+
+    subgraph STM32["STM32F411 @ 100 MHz"]
+        ADC["ADC 1 MSPS<br>DMA Transfer"] --> DSP["FFT + Measurements"]
+        DSP --> OLED["OLED Display"]
+        PWM["PWM Signal Gen<br>1 Hz – 100 kHz"]
+    end
+
+    subgraph ESP32["ESP32 @ 240 MHz"]
+        WS["WebSocket Server<br>Adaptive Streaming"]
+        DDS["DDS Waveform Gen<br>7 waveforms via I2S DAC"]
+    end
+
+    subgraph CLIENT["BROWSER"]
+        UI["Scope + Generator UI<br>Any Device"]
+    end
+
+    AFE --> ADC
+    DSP -.->|"Gain Control"| AFE
+    DSP ==>|"SPI + DMA"| WS
+    DSP <-->|"UART Commands"| WS
+    WS <-->|"WiFi AP"| UI
+
+    style ANALOG fill:#fff3cd,stroke:#ffc107
+    style STM32 fill:#e7f5ff,stroke:#339af0
+    style ESP32 fill:#ffe8cc,stroke:#fd7e14
+    style CLIENT fill:#d3f9d8,stroke:#40c057
+```
+
+| Component | Role |
+|-----------|------|
+| **STM32F411** | Sampling, DSP, measurements, AFE control, PWM generator |
+| **ESP32** | WiFi AP, WebSocket streaming, web UI host, DDS waveform generator |
+| **Dual-MCU split** | Real-time DSP isolated from WiFi jitter — neither subsystem blocks the other |
+
+---
+
+## Signal Generator
+
+Two complementary generators, each leveraging its MCU's strengths:
+
+### STM32 — Hardware PWM
+
+TIM3 generates a clean square wave with precise frequency and duty cycle.
+Primary use: loopback self-test — connect PWM output BNC to scope input BNC
+to verify the entire signal chain with no external equipment.
+
+| Parameter | Value |
+|-----------|-------|
+| Waveform | Square wave |
+| Frequency | 1 Hz – 100 kHz |
+| Duty Cycle | 1% – 99% |
+| Control | Real-time via browser or UART |
+
+### ESP32 — DDS Arbitrary Waveform Generator
+
+Software DDS engine on a dedicated FreeRTOS task (core 1, max priority),
+streaming via I2S DMA to the built-in 8-bit DAC — zero CPU overhead during output.
+
+```mermaid
+flowchart LR
+    FREQ["Frequency<br>Setting"] --> PA["Phase<br>Accumulator<br>32-bit"]
+    PA --> LUT["Waveform LUT<br>4096 entries"]
+    LUT --> I2S["I2S DMA<br>Double-buffered"]
+    I2S --> DAC["Built-in DAC<br>8-bit / GPIO25"]
+
+    style PA fill:#e7f5ff,stroke:#339af0
+    style LUT fill:#d3f9d8,stroke:#40c057
+    style I2S fill:#ffe8cc,stroke:#fd7e14
+```
+
+| Parameter | Value |
+|-----------|-------|
+| Waveforms | Sine, Square, Triangle, Sawtooth, Ramp Down, Noise, DC |
+| DAC | ESP32 built-in 8-bit (GPIO25) via I2S DMA |
+| Amplitude | Software-adjustable (0–255) |
+| Noise | 32-bit Galois LFSR — independent of phase accumulator |
+| CPU Overhead | Zero — I2S DMA streams autonomously |
+
+<details>
+<summary>DDS Implementation Details</summary>
+
+1. A 32-bit **phase accumulator** increments by `(frequency × 2³²) / sample_rate` each sample — sub-Hz resolution across the full range
+2. Upper bits index a **4096-entry LUT** containing one complete waveform period at the requested amplitude
+3. Samples stream to the DAC via **I2S DMA double-buffering** — the generator task only refills completed buffers
+4. A `parametersChanged` flag triggers a LUT rebuild between DMA fills — glitch-free amplitude and frequency updates
+5. Noise mode uses a **32-bit Galois LFSR** (taps: bits 0, 1, 21, 31), bypassing the LUT entirely
+
+</details>
+
+---
+
+## Analog Front End
+
+**Goals:** Single 3.3 V supply · Survive ±26 V · 500 kHz bandwidth · Safe before firmware runs
+
+```mermaid
+flowchart LR
+    BNC["±26V Input"] --> ATTEN["Attenuator<br>÷1 to ÷15.7<br>Relay-switched"]
+    ATTEN --> SHIFT["Level Shift<br>0V → 1.65V centre"]
+    SHIFT --> PGA["PGA<br>×1 to ×12<br>Mux-switched"]
+    PGA --> PROT["Protection<br>BAT54S clamp<br>RC filter"]
+    PROT --> ADC["STM32 ADC<br>12-bit"]
+
+    style ATTEN fill:#fff3cd,stroke:#ffc107
+    style PGA fill:#d3f9d8,stroke:#40c057
+    style PROT fill:#ffe8cc,stroke:#fd7e14
+```
+
+| Stage | Implementation |
+|-------|----------------|
+| Attenuator | 4 relay-switched compensated dividers — ÷1, ÷2.33, ÷5.65, ÷15.7 |
+| Level Shift | TL072 inverting buffer (gain = −1) · 0 V → 1.65 V centre for single-supply ADC |
+| PGA | CD74HC4051 MUX · 8 gains (×1–×12) · matched R·C for flat bandwidth |
+| Protection | BAT54S Schottky clamps to 0–3.3 V · RC anti-alias filter |
+
+**Safe boot:** Hardware pull-downs force ÷15.7 attenuation before MCU initialises —
+ADC is protected even if ±26 V is applied at power-on.
+
+<details>
+<summary>Gain Range Table</summary>
+
+| Input Range | Attenuator | PGA | Full Scale |
+|:-----------:|:----------:|:---:|:----------:|
+| ±25.9 V | ÷15.7 | ×1 | ±26 V |
+| ±9.3 V | ÷5.65 | ×1 | ±9.3 V |
+| ±1.65 V | ÷1 | ×1 | ±1.65 V |
+| ±412 mV | ÷1 | ×4 | ±412 mV |
+| ±137 mV | ÷1 | ×12 | ±137 mV |
+
+</details>
+
+### Schematic
+
+<p align="center">
+  <a href="docs/afe_schematic.png">
+    <img src="docs/afe_schematic.png" alt="AFE Schematic" width="100%">
+  </a>
+  <br>
+  <em>Click to view full resolution</em>
+</p>
+
+---
+
+## Implementation Details
+
+### STM32F411 — Real-Time Engine
+
+| Module | Implementation |
+|--------|----------------|
+| Acquisition | Timer-triggered ADC + DMA · 10 Hz – 1 MSPS · 8192-sample buffer |
+| FFT | CMSIS `arm_rfft_fast_f32` · 4096-pt · Hanning window · parabolic peak interpolation |
+| Measurements | Single-pass min/max/sum/sum² · Schmitt-trigger ZC frequency · EMA α=0.15 |
+| Decimation | Normal (centre sample) · Average (block mean) · Peak Detect (alternating min/max) |
+| PWM Generator | TIM3 hardware · 1 Hz – 100 kHz · auto-prescaler · duty cycle 1–99% |
+| Communication | SPI master + DMA (waveform frames) · UART (commands + measurements) |
+
+### ESP32 — Network & Generator Engine
+
+| Module | Implementation |
+|--------|----------------|
+| WiFi | Soft-AP @ 192.168.4.1 · no router required |
+| WebSocket | Async server · up to 8 clients · binary waveform frames + JSON state |
+| Streaming | Binary frames at 20 FPS · per-client adaptive throttling · auto-reconnect |
+| State Sync | `ScopeState` struct broadcast to all clients on connect and on any change |
+| DDS Generator | FreeRTOS task pinned to core 1 · I2S DMA · 7 waveforms · glitch-free updates |
+| File Server | SPIFFS hosts complete web UI — served on first HTTP request |
+
+### Key Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Dual-MCU split | DSP timing isolated from WiFi jitter — acquisition accuracy unaffected by network load |
+| DMA on every bus | ADC, SPI, and I2S all DMA-driven — CPU 100% free for computation |
+| WiFi AP mode | Works standalone anywhere — no external infrastructure |
+| Web-based UI | Features expandable in pure JavaScript — zero hardware changes ever needed |
+| Hardware safe boot | Pull-downs enforce max attenuation before firmware runs |
+| Phase accumulator DDS | Sub-Hz resolution with 32-bit integer arithmetic at any sample rate |
+| I2S for DAC | Hardware DMA streams waveform autonomously — generator task only fills buffers |
+
+---
+
+## Hardware
+
+<p align="center">
+  <img src="docs/pcb-layout.png" alt="PCB Layout" width="600">
+  <br>
+  <em>PCB layout — 86×58 mm, 2-layer, ENIG finish</em>
+</p>
+
+<p align="center">
+  <img src="docs/hardware.png" alt="Board layout, annotated" width="600">
+  <br>
+  <em>Layout logic — analog front end in the quiet corner, RF at the far edge, single-point ground tie beside the ADC</em>
+</p>
+
+| Document | Description |
+|----------|-------------|
+| 📄 [AFE Schematic](docs/afe-schematic.png) | Analog front end — attenuators, level shifting, PGA, protection |
+| 📄 [Full Schematic (PDF)](docs/full-schematic.pdf) | Complete system schematic |
+| 📄 [PCB Layout](docs/pcb-layout.pdf) | Board layout with component placement |
+
+---
+
+## Bill of Materials — 1,131,000 T / unit (~$6.85)
+
+> **No development boards.** All ICs are bare chips on a custom 2-layer PCB.
+> All components sourced from domestic suppliers. Prices at 100-unit volume.
+> USD rate: ~165,000 T.
+
+| # | Component | Role | Qty | Unit (T) | Source |
+|---|-----------|------|-----|----------|--------|
+| 1 | STM32F411CEU6 | Acquisition, DSP, auto-ranging, PWM gen | 1 | 80,000 | Torob / Jomhouri |
+| 2 | ESP32-WROOM-32 | WiFi AP, WebSocket, DDS generator | 1 | 260,000 | Torob / Bonyad Electronic |
+| 3 | CD74HC4051 | PGA gain selection (×1 – ×12) | 1 | 18,000 | eca.ir |
+| 4 | TL072 | Level-shift buffer + mid-rail ref | 1 | 8,000 | eca.ir |
+| 5 | ULN2003A | Relay coil driver | 1 | 6,500 | eca.ir |
+| 6 | AP2112K-3.3 | Low-noise LDO — dedicated AVCC rail | 1 | 12,000 | ickala.com |
+| 7 | LM1117-3.3 | Digital LDO — 3V3_DIG rail | 1 | 5,000 | ic98.ir |
+| 8 | DPDT Relay 5V (HK19F) | Attenuator switching ÷1 – ÷15.7 | 4 | 22,000 | Jomhouri |
+| 9 | OLED SSD1306 0.96" | Local standalone display | 1 | 90,000 | Torob |
+| 10 | BNC Socket 50Ω × 2 | Scope input + generator output | 2 | 45,000 | sun7shop.ir |
+| 11 | BAT54S Schottky × 2 | ADC input protection clamps | 2 | 3,500 | eca.ir |
+| 12 | Crystal 8 MHz | External clock for accurate ADC timing | 1 | 8,000 | eca.ir |
+| 13 | Passives (70 pcs) | Caps, resistors, ferrite bead, LEDs | — | 30,500 | eca.ir / Jomhouri |
+| 14 | USB-C + headers + switches | Power input, programming, controls | — | 29,000 | eca.ir |
+| 15 | PCB (86×58mm, 2-layer ENIG) | Custom 2-layer PCB — 100-unit run | 1 | 200,000 | PCBWay / JLCPCB |
+| 16 | Assembly consumables | Solder, flux, IPA | — | 80,000 | — |
+
+### Cost Breakdown
+
+| Category | Tomans | USD |
+|----------|--------|-----|
+| Active components | 389,500 | $2.36 |
+| Passives + protection | 68,500 | $0.42 |
+| Connectors + mechanical | 117,000 | $0.71 |
+| PCB + assembly (est.) | 280,000 | $1.70 |
+| **Total per unit** | **1,131,000** | **$6.85** |
+
+> At 500+ units, PCB and passives cost drops ~40%.
+
+---
+
+## Project Structure
+
+```
+├── stm32/                      # STM32F411 firmware (C, HAL)
+│   ├── main.c                  # Main loop, command processing, peripherals
+│   ├── osc_signal.c            # DSP: FFT, measurements, decimation
+│   ├── osc_display.c           # OLED rendering
+│   └── osc_config.h            # System constants and data structures
+│
+├── esp32/                      # ESP32 firmware (C++, Arduino + IDF)
+│   ├── main.cpp                # WiFi AP, WebSocket, state management
+│   ├── spi_handler.cpp         # SPI slave with DMA
+│   ├── signal_generator.cpp    # DDS waveform generator
+│   ├── config.h                # Network and pin configuration
+│   ├── structures.h/cpp        # Measurement and state data types
+│   └── data/index.html         # Web UI (SPIFFS)
+│
+├── docs/                       # Schematics, demos, images
+└── README.md
+```
+
+---
+
+## Known Limitations
+
+| Issue | Status |
+|-------|--------|
+| No voltage calibration (±5% accuracy) | Planned |
+| Software trigger only | Planned |
+| ESP32 DAC: 8-bit — sufficient for sub-100 kHz waveform generation | Hardware limit |
+| Single input channel | Hardware limit |
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE)
+
+---
+
+<p align="center">
+  <b>Mohammad Reza Safaeian</b><br>
+  <a href="mailto:mohammad.rsafaeian@gmail.com">mohammad.rsafaeian@gmail.com</a>
+  ·
+  <a href="https://github.com/mohammadrezasafaeian">GitHub</a>
+</p>

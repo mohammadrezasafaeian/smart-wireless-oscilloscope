@@ -12,6 +12,21 @@
 ![Cost](https://img.shields.io/badge/unit_cost-1.13M%20Tomans-red)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
+<p align="center">
+  <img src="docs/demo-frequency-domain.gif" alt="FFT Spectrum Analysis Demo" width="700">
+</p>
+
+<p align="center">
+  <img src="docs/demo-time-domain.gif" alt="Time Domain Capture Demo" width="700">
+</p>
+
+<p align="center">
+  <img src="docs/generator_demo.gif" alt="DDS Signal Generator Demo" width="700">
+  <br>
+  <em>⭐ NEW — 7-waveform DDS generator with loopback capture</em>
+</p>
+
+
 ---
 
 ## The Problem
